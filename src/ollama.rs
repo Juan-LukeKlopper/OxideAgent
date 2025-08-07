@@ -21,24 +21,40 @@ pub async fn send_chat(
     if stream {
         let mut content = String::new();
         let mut stream = res.bytes_stream();
+        let mut buffer = String::new();
 
         use futures_util::StreamExt;
         use std::io::{self, Write};
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
-            let line = String::from_utf8_lossy(&chunk);
-            for part in line.lines() {
-                if let Some(stripped) = part.strip_prefix("data: ") {
-                    let parsed: serde_json::Value = serde_json::from_str(stripped)?;
-                    if let Some(c) = parsed["message"]["content"].as_str() {
-                        print!("{c}");
-                        io::stdout().flush()?;
-                        content.push_str(c);
+            buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+            while let Some(newline_pos) = buffer.find('\n') {
+                let line = buffer.drain(..=newline_pos).collect::<String>();
+                if line.trim().is_empty() {
+                    continue;
+                }
+
+                let parsed: serde_json::Value = match serde_json::from_str(line.trim()) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("\nError parsing JSON line: '{}', error: {}", line, e);
+                        continue;
                     }
+                };
+
+                if let Some(c) = parsed["message"]["content"].as_str() {
+                    print!("{c}");
+                    io::stdout().flush()?;
+                    content.push_str(c);
+                }
+
+                if parsed["done"].as_bool().unwrap_or(false) {
+                    println!();
+                    return Ok(Some(content));
                 }
             }
         }
-
         println!();
         Ok(Some(content))
     } else {
