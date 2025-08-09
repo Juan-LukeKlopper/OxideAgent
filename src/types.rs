@@ -20,4 +20,11 @@ impl ChatMessage {
             content: content.to_string(),
         }
     }
+
+    pub fn system(content: &str) -> Self {
+        Self {
+            role: "system".to_string(),
+            content: content.to_string(),
+        }
+    }
 }

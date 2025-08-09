@@ -11,10 +11,14 @@ pub struct Agent {
 
 impl Agent {
     pub fn new(name: &str, model: &str) -> Self {
+        let system_message = r#"You are a helpful assistant.
+You have access to the following tools. To use a tool, respond with a JSON object with the following format:
+{"tool": "write_file", "path": "<filename>", "content": "<file_content>"}
+"#;
         Self {
             name: name.to_string(),
             model: model.to_string(),
-            history: vec![],
+            history: vec![ChatMessage::system(system_message)],
         }
     }
 
@@ -26,7 +30,7 @@ impl Agent {
         self.history.push(ChatMessage::assistant(content));
     }
 
-    pub async fn chat(&mut self, client: &Client, stream: bool) -> anyhow::Result<()> {
+    pub async fn chat(&mut self, client: &Client, stream: bool) -> anyhow::Result<Option<String>> {
         if stream {
             print!("{}: ", self.name);
             io::stdout().flush()?;
@@ -34,13 +38,13 @@ impl Agent {
 
         let response = send_chat(client, &self.model, &self.history, stream).await?;
 
-        if let Some(content) = response {
+        if let Some(content) = response.clone() {
             if !stream {
                 println!("{}: {}", self.name, content);
             }
             self.add_assistant_message(&content);
         }
 
-        Ok(())
+        Ok(response)
     }
 }
