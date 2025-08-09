@@ -12,8 +12,14 @@ pub struct Agent {
 impl Agent {
     pub fn new(name: &str, model: &str) -> Self {
         let system_message = r#"You are a helpful assistant.
-You have access to the following tools. To use a tool, respond with a JSON object with the following format:
-{"tool": "write_file", "path": "<filename>", "content": "<file_content>"}
+You have access to the following tools. To use a tool, respond with a JSON object.
+
+Here are the available tools:
+- `{"tool": "write_file", "path": "<filename>", "content": "<file_content>"}`
+- `{"tool": "read_file", "path": "<filename>"}`
+- `{"tool": "run_shell_command", "command": "<command>"}`
+
+When you use a tool, the output will be returned to you in the next message.
 "#;
         Self {
             name: name.to_string(),
