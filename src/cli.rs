@@ -22,7 +22,7 @@ impl AgentType {
         match self {
             AgentType::Code => "qwen3:4b",
             AgentType::Reviewer => "tinydolphin",
-            AgentType::Doc => "phi3",
+            AgentType::Doc => "granite3.3",
         }
     }
 
