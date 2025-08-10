@@ -1,9 +1,12 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
     pub content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 impl ChatMessage {
@@ -11,6 +14,7 @@ impl ChatMessage {
         Self {
             role: "user".to_string(),
             content: content.to_string(),
+            tool_calls: None,
         }
     }
 
@@ -18,6 +22,7 @@ impl ChatMessage {
         Self {
             role: "assistant".to_string(),
             content: content.to_string(),
+            tool_calls: None,
         }
     }
 
@@ -25,6 +30,39 @@ impl ChatMessage {
         Self {
             role: "system".to_string(),
             content: content.to_string(),
+            tool_calls: None,
         }
     }
+
+    pub fn tool_call(content: &str, tool_calls: Vec<ToolCall>) -> Self {
+        Self {
+            role: "assistant".to_string(),
+            content: content.to_string(),
+            tool_calls: Some(tool_calls),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub function: ToolFunction,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunction {
+    pub name: String,
+    pub arguments: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Tool {
+    pub r#type: String,
+    pub function: ToolFunctionDefinition,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolFunctionDefinition {
+    pub name: String,
+    pub description: String,
+    pub parameters: Value,
 }
