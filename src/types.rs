@@ -66,3 +66,16 @@ pub struct ToolFunctionDefinition {
     pub description: String,
     pub parameters: Value,
 }
+
+impl Tool {
+    pub fn new(name: &str, description: &str, parameters: Value) -> Self {
+        Self {
+            r#type: "function".to_string(),
+            function: ToolFunctionDefinition {
+                name: name.to_string(),
+                description: description.to_string(),
+                parameters,
+            },
+        }
+    }
+}
