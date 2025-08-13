@@ -10,9 +10,12 @@ OxideAgent is a Rust-based AI agent that allows you to chat with local language 
 
 *   **Local-First:** All processing is done on your local machine, ensuring privacy and control over your data.
 *   **Ollama Integration:** Seamlessly connects to the Ollama platform to leverage a wide range of local language models.
-*   **Multi-Agent Support:** Easily switch between different AI "personalities" or agents, each configured with a specific model.
-*   **Interactive Chat:** Engage in continuous conversations with the selected agent, with support for session memory.
+*   **Multi-Agent Support:** Easily switch between different agents, each configured with a specific model.
+*   **Persistent Sessions:** The agent remembers your conversation history, allowing you to stop and resume long-running tasks at any time.
 *   **Streaming Responses:** Get real-time feedback from the agent as it generates a response.
+*   **Extensible Tool System:** Uses a scalable, trait-based system for adding new tools.
+*   **Native Tool Calling:** Leverages Ollama's native tool-calling API for reliable and structured tool interactions.
+*   **Tool Approval System:** A security-focused workflow requires user approval before executing any tool.
 
 ## Getting Started
 
@@ -32,8 +35,8 @@ To get a local copy up and running follow these simple steps.
 2.  Install the required Ollama models
     ```sh
     ollama pull qwen3:4b
-    ollama pull tinydolphin
-    ollama pull phi3
+    ollama pull llama3.2
+    ollama pull granite3.3
     ```
 3.  Build the project
     ```sh
@@ -42,16 +45,18 @@ To get a local copy up and running follow these simple steps.
 
 ## Usage
 
-To start a chat session with the default agent, run the following command:
+To start a chat session with the default agent (`qwen`), run the following command:
 
 ```sh
 cargo run
 ```
 
+The agent will welcome you back if it finds a previous session file (`session.json`). To start a fresh session, you can delete this file.
+
 You can also select a specific agent using the `--agent` flag:
 
 ```sh
-cargo run -- --agent reviewer
+cargo run -- --agent llama
 ```
 
 To see a list of available agents, use the `--help` flag:
@@ -62,13 +67,37 @@ cargo run -- --help
 
 To exit the chat, type `/exit`.
 
+### Available Agents
+
+1.  **Qwen** (`--agent qwen`): Uses the `qwen3:4b` model. The default agent.
+2.  **Llama** (`--agent llama`): Uses the `llama3.2` model.
+3.  **Granite** (`--agent granite`): Uses the `granite3.3` model.
+
+### Tool Capabilities
+
+The agent has access to several tools that allow it to interact with your system:
+
+1.  **write_file**: Write content to a file on your system.
+2.  **read_file**: Read content from a file on your system.
+3.  **run_shell_command**: Execute shell commands on your system.
+
+When the agent wants to use a tool, you'll be prompted to approve its execution for security.
+
 ## Project Roadmap
 
-Future development will focus on expanding the agent's capabilities. Key features on the roadmap include:
+The project has a solid foundation with the following features already implemented:
+*   Basic Ollama connection
+*   Interactive multi-agent chat
+*   File operations and shell command execution
+*   A "smart" native tool-calling system
+*   An orchestrator with persistent memory for resumable sessions
 
-*   **Tool Integration:** Allowing the agent to interact with external tools and APIs (e.g., writing to files, running shell commands).
-*   **Persistent Memory:** Enabling the agent to remember context and state across sessions.
-*   **TUI Makeover:** Transforming the CLI into a more interactive and user-friendly Terminal User Interface (TUI).
+Future development will focus on expanding the agent's capabilities:
+*   **TUI Makeover:** Transform the CLI into a more interactive and user-friendly Terminal User Interface (TUI).
+*   **Multi-Session Management:** Allow for creating and switching between multiple named sessions.
+*   **MCP Server Integration:** Connect to Model Context Protocol servers for advanced tooling.
+*   **Smart Tool & Prompt Inclusion:** Dynamically select tools and system prompts based on the agent's task.
+*   **Advanced Workflow Management:** Handle complex, multi-step operations with better planning and error handling.
 
 ## Contributing
 
