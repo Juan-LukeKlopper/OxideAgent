@@ -10,12 +10,19 @@ use cli::Args;
 use reqwest::Client;
 use std::collections::HashSet;
 use tokio;
+use tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
 use types::ToolCall;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let client = Client::new();
+
+    // Create and populate the tool registry
+    let mut tool_registry = ToolRegistry::new();
+    tool_registry.add_tool(Box::new(WriteFileTool));
+    tool_registry.add_tool(Box::new(ReadFileTool));
+    tool_registry.add_tool(Box::new(RunShellCommandTool));
 
     let mut agent = Agent::new(args.agent.name(), args.agent.model());
     let mut session_allowed_tools: HashSet<String> = HashSet::new();
@@ -36,7 +43,10 @@ async fn main() -> anyhow::Result<()> {
         agent.add_user_message(input);
 
         'agent_turn: loop {
-            if let Some(response) = agent.chat(&client, !args.no_stream).await? {
+            let tool_definitions = tool_registry.definitions();
+            if let Some(response) = agent
+                .chat(&client, &tool_definitions, !args.no_stream)
+                .await? {
                 // Check if the response contains tool calls
                 if let Some(tool_calls) = &response.tool_calls {
                     if !tool_calls.is_empty() {
@@ -144,7 +154,8 @@ async fn main() -> anyhow::Result<()> {
                             let tool_call = &tool_calls[index];
                             if approved {
                                 any_executed = true;
-                                let tool_output = execute_tool(&tool_call).await?;
+                                let tool_output =
+                                    execute_tool(&tool_registry, &tool_call).await?;
                                 println!("Tool '{}' output: {}", tool_call.function.name, tool_output);
                                 
                                 // Add the tool output to the conversation
@@ -176,25 +187,16 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn execute_tool(tool_call: &ToolCall) -> anyhow::Result<String> {
-    match tool_call.function.name.as_str() {
-        "write_file" => {
-            let args = &tool_call.function.arguments;
-            let path = args["path"].as_str().unwrap_or("");
-            let content = args["content"].as_str().unwrap_or("");
-            tools::write_to_file(path, content)?;
-            Ok(format!("File '{}' written successfully.", path))
-        }
-        "read_file" => {
-            let args = &tool_call.function.arguments;
-            let path = args["path"].as_str().unwrap_or("");
-            tools::read_file(path)
-        }
-        "run_shell_command" => {
-            let args = &tool_call.function.arguments;
-            let command = args["command"].as_str().unwrap_or("");
-            tools::run_shell_command(command)
-        }
-        _ => Err(anyhow::anyhow!("Unknown tool: {}", tool_call.function.name)),
+async fn execute_tool(
+    registry: &ToolRegistry,
+    tool_call: &ToolCall,
+) -> anyhow::Result<String> {
+    if let Some(tool) = registry.get_tool(&tool_call.function.name) {
+        tool.execute(&tool_call.function.arguments)
+    } else {
+        Err(anyhow::anyhow!(
+            "Unknown tool: {}",
+            tool_call.function.name
+        ))
     }
 }
