@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Clone)]
+pub enum AppEvent {
+    UserInput(String),
+    AgentMessage(String),
+    AgentStreamChunk(String),
+    AgentStreamEnd,
+    ToolRequest(Vec<ToolCall>),
+    ToolResult(String, String),
+    Error(String),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
