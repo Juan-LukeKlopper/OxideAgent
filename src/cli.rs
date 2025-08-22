@@ -22,7 +22,7 @@ impl AgentType {
         match self {
             AgentType::Qwen => "qwen3:4b",
             AgentType::Llama => "llama3.2",
-            AgentType::Granite => "granite3.3",
+            AgentType::Granite => "smolLM2",
         }
     }
 
@@ -34,3 +34,4 @@ impl AgentType {
         }
     }
 }
+

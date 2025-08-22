@@ -4,7 +4,7 @@ use std::fs;
 use std::process::Command;
 
 // The main trait for any tool that can be executed by the agent.
-pub trait Tool {
+pub trait Tool: Send + Sync {
     fn name(&self) -> String;
     fn description(&self) -> String;
     fn parameters(&self) -> Value;

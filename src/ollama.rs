@@ -1,13 +1,20 @@
-use crate::types::{ChatMessage, Tool, ToolCall};
+use crate::types::{AppEvent, ChatMessage, Tool, ToolCall};
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::json;
+use tokio::sync::mpsc;
 
 pub async fn send_chat(
     client: &Client,
     model: &str,
-    history: &[ChatMessage],
-    tools: &[Tool],
+    history: &[
+        ChatMessage
+    ],
+    tools: &[
+        Tool
+    ],
     stream: bool,
+    tx: mpsc::Sender<AppEvent>,
 ) -> anyhow::Result<Option<ChatMessage>> {
     let res = client
         .post("http://localhost:11434/api/chat")
@@ -26,7 +33,6 @@ pub async fn send_chat(
         let mut stream = res.bytes_stream();
         let mut buffer = String::new();
 
-        use futures_util::StreamExt;
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
             buffer.push_str(&String::from_utf8_lossy(&chunk));
@@ -40,20 +46,22 @@ pub async fn send_chat(
                 let parsed: serde_json::Value = match serde_json::from_str(line.trim()) {
                     Ok(p) => p,
                     Err(e) => {
-                        eprintln!("\nError parsing JSON line: '{}', error: {}", line, e);
+                        tx.send(AppEvent::Error(format!(
+                            "Error parsing JSON line: '{}', error: {}",
+                            line,
+                            e
+                        )))
+                        .await?;
                         continue;
                     }
                 };
 
-                // Handle content - print immediately as we receive it
                 if let Some(c) = parsed["message"]["content"].as_str() {
-                    // Let's add some debug output to see what's happening
-                    print!("{}", c);
-                    std::io::Write::flush(&mut std::io::stdout())?;
+                    tx.send(AppEvent::AgentStreamChunk(c.to_string()))
+                        .await?;
                     content.push_str(c);
                 }
 
-                // Handle tool calls
                 if let Some(tool_call_array) = parsed["message"]["tool_calls"].as_array() {
                     for tool_call in tool_call_array {
                         if let Ok(tc) = serde_json::from_value::<ToolCall>(tool_call.clone()) {
@@ -63,7 +71,7 @@ pub async fn send_chat(
                 }
 
                 if parsed["done"].as_bool().unwrap_or(false) {
-                    println!();
+                    tx.send(AppEvent::AgentStreamEnd).await?;
                     let message = if !tool_calls.is_empty() {
                         ChatMessage::tool_call(&content, tool_calls)
                     } else {
@@ -73,7 +81,7 @@ pub async fn send_chat(
                 }
             }
         }
-        println!();
+        tx.send(AppEvent::AgentStreamEnd).await?;
         let message = if !tool_calls.is_empty() {
             ChatMessage::tool_call(&content, tool_calls)
         } else {
@@ -81,12 +89,13 @@ pub async fn send_chat(
         };
         Ok(Some(message))
     } else {
+        // Non-streaming case remains the same
         let json: serde_json::Value = res.json().await?;
         let content = json["message"]["content"]
             .as_str()
             .unwrap_or("")
             .to_string();
-        
+
         let mut tool_calls: Vec<ToolCall> = Vec::new();
         if let Some(tool_call_array) = json["message"]["tool_calls"].as_array() {
             for tool_call in tool_call_array {
@@ -95,7 +104,7 @@ pub async fn send_chat(
                 }
             }
         }
-        
+
         let message = if !tool_calls.is_empty() {
             ChatMessage::tool_call(&content, tool_calls)
         } else {

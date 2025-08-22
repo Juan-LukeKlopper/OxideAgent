@@ -1,7 +1,9 @@
-use crate::ollama::send_chat;
-use crate::types::{ChatMessage, Tool};
+use crate::{
+    ollama::send_chat,
+    types::{AppEvent, ChatMessage, Tool},
+};
 use reqwest::Client;
-use std::io::{self, Write};
+use tokio::sync::mpsc;
 
 pub struct Agent {
     pub name: String,
@@ -12,7 +14,7 @@ pub struct Agent {
 impl Agent {
     pub fn new(name: &str, model: &str) -> Self {
         let system_message = "You are a helpful assistant. You have access to tools that can help you perform various tasks. Use them when appropriate.";
-        
+
         Self {
             name: name.to_string(),
             model: model.to_string(),
@@ -28,19 +30,16 @@ impl Agent {
         self.history.push(message);
     }
 
-    pub async fn chat(&mut self, client: &Client, tools: &[Tool], stream: bool) -> anyhow::Result<Option<ChatMessage>> {
-        if stream {
-            print!("{}: ", self.name);
-            io::stdout().flush()?;
-        }
-
-        let response = send_chat(client, &self.model, &self.history, tools, stream).await?;
+    pub async fn chat(
+        &mut self,
+        client: &Client,
+        tools: &[Tool],
+        stream: bool,
+        tx: mpsc::Sender<AppEvent>,
+    ) -> anyhow::Result<Option<ChatMessage>> {
+        let response = send_chat(client, &self.model, &self.history, tools, stream, tx).await?;
 
         if let Some(message) = response.clone() {
-            // Don't print content here when streaming, as it's already printed in send_chat
-            if !stream {
-                println!("{}: {}", self.name, message.content);
-            }
             self.add_assistant_message(message.clone());
         }
 
