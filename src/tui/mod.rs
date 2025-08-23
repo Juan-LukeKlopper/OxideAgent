@@ -271,7 +271,28 @@ fn render_chat_history(
     for (idx, msg) in messages.iter().enumerate().rev() {
         let content = msg.to_string();
         let width = inner_chat_area.width as usize;
-        let height = (content.len() / width) as u16 + 1 + 2; // +1 for lines, +2 for borders
+        // Calculate height based on actual rendered content
+        let line_count = if width > 0 {
+            // For collapsed thinking messages, limit to just a few lines
+            let actual_lines = match msg {
+                Message::Thinking(_, content, is_expanded) => {
+                    if *is_expanded {
+                        // Expanded thinking - count all lines
+                        content.lines().count()
+                    } else {
+                        // Collapsed thinking - limit to 3 lines plus ellipsis
+                        3
+                    }
+                }
+                _ => content.lines().count()
+            };
+            
+            // Estimate wrapped lines
+            actual_lines + (actual_lines / (width / 80).max(1))
+        } else {
+            content.lines().count()
+        };
+        let height = line_count as u16 + 2; // +2 for borders
 
         if y_offset + height < inner_chat_area.height {
             let msg_area = Rect::new(
