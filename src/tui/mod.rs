@@ -1,14 +1,17 @@
 use crate::types::{AppEvent, ToolApprovalResponse};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, MouseEvent,
+        MouseEventKind,
+    },
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Position, Rect},
     widgets::{Block, Borders, Paragraph, Wrap},
-    Frame, Terminal,
 };
 use std::io;
 use std::time::Duration;
@@ -27,6 +30,8 @@ pub struct Tui {
     input: Input,
     tool_calls: Vec<crate::types::ToolCall>,
     is_awaiting_confirmation: bool,
+    // Track message positions for click detection
+    message_positions: Vec<(usize, Rect)>, // (message_index, area)
 }
 
 impl Tui {
@@ -44,26 +49,35 @@ impl Tui {
             input: Input::default(),
             tool_calls: Vec::new(),
             is_awaiting_confirmation: false,
+            message_positions: Vec::new(),
         })
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
             self.terminal.draw(|f| {
+                self.message_positions.clear(); // Clear previous positions
                 ui(
                     f,
                     &self.messages,
                     &self.input,
                     &self.tool_calls,
                     self.is_awaiting_confirmation,
+                    &mut self.message_positions,
                 );
             })?;
 
             if event::poll(Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
-                    if self.handle_key_event(key).await? {
-                        break;
+                match event::read()? {
+                    Event::Key(key) => {
+                        if self.handle_key_event(key).await? {
+                            break;
+                        }
                     }
+                    Event::Mouse(mouse) => {
+                        self.handle_mouse_event(mouse);
+                    }
+                    _ => {}
                 }
             }
 
@@ -78,9 +92,35 @@ impl Tui {
         match event {
             AppEvent::AgentStreamChunk(chunk) => {
                 if !chunk.is_empty() {
-                    if let Some(Message::Agent(_, content)) = self.messages.last_mut() {
-                        content.push_str(&chunk);
+                    // Check if this is the start of a thinking section (starts with <think>)
+                    if chunk.trim_start().starts_with("<think>") {
+                        // Create a new thinking message, expanded by default
+                        self.messages.push(Message::Thinking(
+                            crate::agents::AgentId::Ollama,
+                            chunk,
+                            true,
+                        ));
+                    } else if let Some(last_message) = self.messages.last_mut() {
+                        match last_message {
+                            Message::Thinking(_, content, is_expanded) => {
+                                content.push_str(&chunk);
+                                // Check if this is the end of a thinking section (ends with </think>)
+                                if chunk.trim_end().ends_with("</think>") {
+                                    // Collapse the thinking section by default after it's complete
+                                    *is_expanded = false;
+                                }
+                            }
+                            Message::Agent(_, content) => {
+                                content.push_str(&chunk);
+                            }
+                            _ => {
+                                // Create a new agent message if the last message wasn't a thinking or agent message
+                                self.messages
+                                    .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
+                            }
+                        }
                     } else {
+                        // Create a new agent message if there are no previous messages
                         self.messages
                             .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
                     }
@@ -174,6 +214,35 @@ impl Tui {
         Ok(false)
     }
 
+    fn handle_mouse_event(&mut self, mouse: MouseEvent) {
+        match mouse.kind {
+            MouseEventKind::Down(_) => {
+                // Handle mouse click to expand/collapse thinking sections
+                self.toggle_thinking_section(mouse.column, mouse.row);
+            }
+            _ => {}
+        }
+    }
+
+    fn toggle_thinking_section(&mut self, column: u16, row: u16) {
+        // Find which message was clicked based on position
+        for (message_index, area) in &self.message_positions {
+            if column >= area.x
+                && column < area.x + area.width
+                && row >= area.y
+                && row < area.y + area.height
+            {
+                // Found the clicked message
+                if let Some(message) = self.messages.get_mut(*message_index) {
+                    if let Message::Thinking(_, _, is_expanded) = message {
+                        *is_expanded = !*is_expanded;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
     pub fn restore(&mut self) -> anyhow::Result<()> {
         disable_raw_mode()?;
         execute!(
@@ -186,14 +255,20 @@ impl Tui {
     }
 }
 
-fn render_chat_history(f: &mut Frame, area: Rect, messages: &[Message]) {
+fn render_chat_history(
+    f: &mut Frame,
+    area: Rect,
+    messages: &[Message],
+    message_positions: &mut Vec<(usize, Rect)>,
+) {
     let chat_history_block = Block::default().title("Conversation").borders(Borders::ALL);
     let inner_chat_area = chat_history_block.inner(area);
     f.render_widget(chat_history_block, area);
 
     let mut y_offset = 0;
+    let _message_index = messages.len();
 
-    for msg in messages.iter().rev() {
+    for (idx, msg) in messages.iter().enumerate().rev() {
         let content = msg.to_string();
         let width = inner_chat_area.width as usize;
         let height = (content.len() / width) as u16 + 1 + 2; // +1 for lines, +2 for borders
@@ -205,6 +280,10 @@ fn render_chat_history(f: &mut Frame, area: Rect, messages: &[Message]) {
                 inner_chat_area.width,
                 height,
             );
+
+            // Store the position of this message for click detection
+            message_positions.push((idx, msg_area));
+
             msg.render(f, msg_area);
             y_offset += height;
         } else {
@@ -219,6 +298,7 @@ fn ui(
     input: &Input,
     tool_calls: &[crate::types::ToolCall],
     is_awaiting_confirmation: bool,
+    message_positions: &mut Vec<(usize, Rect)>,
 ) {
     let input_height = if is_awaiting_confirmation {
         let mut text = String::new();
@@ -250,7 +330,7 @@ fn ui(
         .constraints([Constraint::Min(0), Constraint::Length(input_height)].as_ref())
         .split(f.area());
 
-    render_chat_history(f, chunks[0], messages);
+    render_chat_history(f, chunks[0], messages, message_positions);
     render_input_box(f, chunks[1], input, tool_calls, is_awaiting_confirmation);
 }
 
@@ -274,8 +354,11 @@ fn render_input_box(
     if is_awaiting_confirmation {
         let mut text = String::new();
         for call in tool_calls {
-            text.push_str(&format!("Tool: {}
-", call.function.name));
+            text.push_str(&format!(
+                "Tool: {}
+",
+                call.function.name
+            ));
             text.push_str(&format!(
                 "Arguments: {}
 \n",
