@@ -16,6 +16,8 @@ OxideAgent is a Rust-based AI agent that allows you to chat with local language 
 *   **Extensible Tool System:** Uses a scalable, trait-based system for adding new tools.
 *   **Native Tool Calling:** Leverages Ollama's native tool-calling API for reliable and structured tool interactions.
 *   **Tool Approval System:** A security-focused workflow requires user approval before executing any tool.
+*   **Advanced TUI Interface:** Features a Terminal User Interface with collapsible sections for reasoning and tool outputs.
+*   **Thinking Process Visualization:** Clearly separates agent reasoning from final responses with expandable/collapsible sections.
 
 ## Getting Started
 
@@ -83,6 +85,16 @@ The agent has access to several tools that allow it to interact with your system
 
 When the agent wants to use a tool, you'll be prompted to approve its execution for security.
 
+## TUI Features
+
+The Terminal User Interface provides an enhanced chat experience with several advanced features:
+
+*   **Collapsible Reasoning Sections**: Agent thinking processes are displayed in expandable/collapsible sections marked with `[Click to expand/collapse]`
+*   **Collapsible Tool Outputs**: Tool execution results are also displayed in expandable/collapsible sections by default
+*   **Real-time Streaming**: Watch responses appear character-by-character as they're generated
+*   **Mouse Support**: Click on section headers to expand or collapse content
+*   **Improved Layout**: Better organized chat history with clear visual separation between different message types
+
 ## Project Roadmap
 
 The project has a solid foundation with the following features already implemented:
@@ -91,9 +103,9 @@ The project has a solid foundation with the following features already implement
 *   File operations and shell command execution
 *   A "smart" native tool-calling system
 *   An orchestrator with persistent memory for resumable sessions
+*   Advanced TUI with collapsible sections for better visualization
 
 Future development will focus on expanding the agent's capabilities:
-*   **TUI Makeover:** Transform the CLI into a more interactive and user-friendly Terminal User Interface (TUI).
 *   **Multi-Session Management:** Allow for creating and switching between multiple named sessions.
 *   **MCP Server Integration:** Connect to Model Context Protocol servers for advanced tooling.
 *   **Smart Tool & Prompt Inclusion:** Dynamically select tools and system prompts based on the agent's task.
