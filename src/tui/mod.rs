@@ -273,22 +273,33 @@ fn render_chat_history(
         let width = inner_chat_area.width as usize;
         // Calculate height based on actual rendered content
         let line_count = if width > 0 {
-            // For collapsed thinking messages, limit to just a few lines
-            let actual_lines = match msg {
+            // For thinking messages, calculate based on displayed content
+            let display_content = match msg {
                 Message::Thinking(_, content, is_expanded) => {
                     if *is_expanded {
-                        // Expanded thinking - count all lines
-                        content.lines().count()
+                        // Expanded thinking - show full content
+                        content.clone()
                     } else {
-                        // Collapsed thinking - limit to 3 lines plus ellipsis
-                        3
+                        // Collapsed thinking - show just a preview
+                        let lines: Vec<&str> = content.lines().collect();
+                        if lines.len() > 3 {
+                            format!("{}\n{}\n{}...", lines[0], lines[1], lines[2])
+                        } else {
+                            lines.first().unwrap_or(&"Thinking...").to_string()
+                        }
                     }
                 }
-                _ => content.lines().count()
+                _ => content.clone()
             };
             
-            // Estimate wrapped lines
-            actual_lines + (actual_lines / (width / 80).max(1))
+            // Count wrapped lines more accurately
+            display_content.lines().map(|line| {
+                if line.is_empty() {
+                    1
+                } else {
+                    (line.chars().count() / width.max(1)) + 1
+                }
+            }).sum::<usize>()
         } else {
             content.lines().count()
         };
