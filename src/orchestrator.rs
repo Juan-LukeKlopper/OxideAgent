@@ -1,6 +1,6 @@
 use crate::agents::Agent;
 use crate::tools::ToolRegistry;
-use crate::types::{AppEvent, ChatMessage, ToolCall};
+use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -80,49 +80,68 @@ impl Orchestrator {
                         self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
                 }
-                _ => {} // Ignore other events for now
+                AppEvent::ToolApproval(response) => {
+                    if let Err(e) = self.handle_tool_approval(response).await {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    }
+                }
+                _ => {}
             }
         }
         Ok(())
     }
 
     pub async fn handle_user_input(&mut self, input: &str) -> anyhow::Result<()> {
-        // If there are pending tool calls, the user input is the approval
-        if let Some(tool_calls) = self.pending_tool_calls.take() {
-            if input.trim().eq_ignore_ascii_case("y") {
-                for tool_call in tool_calls {
-                    let tool_output = self.execute_tool(&tool_call).await?;
-                    self.tx
-                        .send(AppEvent::ToolResult(
-                            tool_call.function.name.clone(),
-                            tool_output.clone(),
-                        ))
-                        .await?;
-                    self.agent.add_user_message(&format!(
-                        "The tool '{}' produced this output:\n{}",
-                        tool_call.function.name,
-                        tool_output
-                    ));
-                }
-                self.save_state()?;
-                // Let the agent process the tool output
-                return self.chat_with_agent().await;
-            } else {
-                self.agent
-                    .add_user_message("Tool execution denied by user.");
-                self.tx
-                    .send(AppEvent::AgentMessage(
-                        "Tool execution denied.".to_string(),
-                    ))
-                    .await?;
-                self.save_state()?;
-                return Ok(());
-            }
-        }
-
         // If no pending tool calls, this is a new user message
         self.agent.add_user_message(input);
         self.chat_with_agent().await
+    }
+
+    async fn handle_tool_approval(&mut self, response: ToolApprovalResponse) -> anyhow::Result<()> {
+        if let Some(tool_calls) = self.pending_tool_calls.take() {
+            match response {
+                ToolApprovalResponse::Allow => {
+                    for tool_call in tool_calls {
+                        let tool_output = self.execute_tool(&tool_call).await?;
+                        self.tx
+                            .send(AppEvent::ToolResult(
+                                tool_call.function.name.clone(),
+                                tool_output.clone(),
+                            ))
+                            .await?;
+                        self.agent.add_user_message(&format!(
+                            "The tool '{}' produced this output:\n{}",
+                            tool_call.function.name,
+                            tool_output
+                        ));
+                    }
+                    self.save_state()?;
+                    // Let the agent process the tool output
+                    return self.chat_with_agent().await;
+                }
+                ToolApprovalResponse::Deny => {
+                    self.agent
+                        .add_user_message("Tool execution denied by user.");
+                    self.tx
+                        .send(AppEvent::AgentMessage(
+                            "Tool execution denied.".to_string(),
+                        ))
+                        .await?;
+                    self.save_state()?;
+                    return Ok(())
+                }
+                // TODO: Implement AlwaysAllow and AlwaysAllowSession
+                _ => {
+                    self.tx
+                        .send(AppEvent::Error(
+                            "This approval mode is not implemented yet.".to_string(),
+                        ))
+                        .await?;
+                    return Ok(())
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn chat_with_agent(&mut self) -> anyhow::Result<()> {

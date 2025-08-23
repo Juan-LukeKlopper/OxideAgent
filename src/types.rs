@@ -2,8 +2,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
+pub enum ToolApprovalResponse {
+    Allow,
+    AlwaysAllow,
+    AlwaysAllowSession,
+    Deny,
+}
+
+#[derive(Debug, Clone)]
 pub enum AppEvent {
     UserInput(String),
+    ToolApproval(ToolApprovalResponse),
     AgentMessage(String),
     AgentStreamChunk(String),
     AgentStreamEnd,

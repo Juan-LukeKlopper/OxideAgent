@@ -41,7 +41,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Run the orchestrator in a separate task
     tokio::spawn(async move {
-        orchestrator.run().await.unwrap();
+        if let Err(e) = orchestrator.run().await {
+            eprintln!("Orchestrator error: {}", e);
+        }
     });
 
     // Initialize and run the TUI

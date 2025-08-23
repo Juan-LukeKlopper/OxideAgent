@@ -5,18 +5,31 @@ use crate::{
 use reqwest::Client;
 use tokio::sync::mpsc;
 
+#[derive(Debug, Clone)] // Added Debug and Clone for AgentId
+pub enum AgentId {
+    Ollama,
+    // User,  // Commenting out unused variant
+}
+
+impl std::fmt::Display for AgentId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AgentId::Ollama => write!(f, "Ollama"),
+            // AgentId::User => write!(f, "User"),  // Commented out unused variant
+        }
+    }
+}
+
 pub struct Agent {
-    pub name: String,
     pub model: String,
     pub history: Vec<ChatMessage>,
 }
 
 impl Agent {
-    pub fn new(name: &str, model: &str) -> Self {
+    pub fn new(_name: &str, model: &str) -> Self {
         let system_message = "You are a helpful assistant. You have access to tools that can help you perform various tasks. Use them when appropriate.";
 
         Self {
-            name: name.to_string(),
             model: model.to_string(),
             history: vec![ChatMessage::system(system_message)],
         }
