@@ -163,11 +163,14 @@ impl Orchestrator {
                         .send(AppEvent::ToolRequest(tool_calls.clone()))
                         .await?;
                     self.pending_tool_calls = Some(tool_calls.clone());
-                } else {
+                } else if self.no_stream {
+                    // For non-streaming responses, we need to send AgentMessage to display the content
                     self.tx
                         .send(AppEvent::AgentMessage(response.content.clone()))
                         .await?;
                 }
+                // For streaming responses, the content is already displayed via AgentStreamChunk events
+                // The streaming case is handled by the UI, which accumulates chunks into a message
             }
             self.save_state()?;
             break 'agent_turn;

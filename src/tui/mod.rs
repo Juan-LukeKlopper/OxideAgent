@@ -77,14 +77,23 @@ impl Tui {
     fn handle_app_event(&mut self, event: AppEvent) -> anyhow::Result<()> {
         match event {
             AppEvent::AgentStreamChunk(chunk) => {
-                if let Some(Message::Agent(_, content)) = self.messages.last_mut() {
-                    content.push_str(&chunk);
-                } else {
-                    self.messages
-                        .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
+                if !chunk.is_empty() {
+                    if let Some(Message::Agent(_, content)) = self.messages.last_mut() {
+                        content.push_str(&chunk);
+                    } else {
+                        self.messages
+                            .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
+                    }
                 }
             }
-            AppEvent::AgentStreamEnd => {}
+            AppEvent::AgentStreamEnd => {
+                // Clean up any empty agent messages that might have been created
+                if let Some(Message::Agent(_, content)) = self.messages.last() {
+                    if content.is_empty() {
+                        self.messages.pop();
+                    }
+                }
+            }
             AppEvent::AgentMessage(content) => {
                 self.messages
                     .push(Message::Agent(crate::agents::AgentId::Ollama, content));
