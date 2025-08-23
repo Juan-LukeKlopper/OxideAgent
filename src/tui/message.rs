@@ -1,9 +1,9 @@
 use ratatui::{
-    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    Frame,
 };
 
 use crate::{agents::AgentId, types::ToolCall};
@@ -13,7 +13,7 @@ pub enum Message {
     User(String),
     Agent(AgentId, String),
     Thinking(AgentId, String, bool), // AgentId, content, is_expanded
-    ToolOutput(String),
+    ToolOutput(String, bool), // content, is_expanded
     ToolConfirmation(Vec<ToolCall>),
 }
 
@@ -23,13 +23,11 @@ impl ToString for Message {
             Message::User(s) => s.clone(),
             Message::Agent(_, s) => s.clone(),
             Message::Thinking(_, s, _) => s.clone(),
-            Message::ToolOutput(s) => s.clone(),
+            Message::ToolOutput(s, _) => s.clone(),
             Message::ToolConfirmation(calls) => {
-                let mut confirmation_text =
-                    String::from("Agent wants to use the following tools:\n");
+                let mut confirmation_text = String::from("Agent wants to use the following tools:\n");
                 for call in calls {
-                    let args = serde_json::to_string_pretty(&call.function.arguments)
-                        .unwrap_or_else(|_| "Invalid JSON".to_string());
+                    let args = serde_json::to_string_pretty(&call.function.arguments).unwrap_or_else(|_| "Invalid JSON".to_string());
                     confirmation_text.push_str(&format!("- {}: \n{}", call.function.name, args));
                 }
                 confirmation_text.push_str("Do you approve?");
@@ -76,11 +74,11 @@ impl Message {
                 } else {
                     "Agent (Thinking...) [Click to expand]"
                 };
-
+                
                 // Process content to handle the #### markers
                 let processed_content = if *is_expanded {
                     // When expanded, show the full content but highlight the markers
-                    content.replace("<think>", "[REASONING BOUNDARY]")
+                    content.replace("####", "[REASONING BOUNDARY]")
                 } else {
                     // When collapsed, show a preview
                     let lines: Vec<&str> = content.lines().collect();
@@ -90,7 +88,7 @@ impl Message {
                         content.lines().next().unwrap_or("Thinking...").to_string()
                     }
                 };
-
+                
                 Paragraph::new(processed_content)
                     .block(
                         Block::default()
@@ -106,20 +104,41 @@ impl Message {
                     )
                     .wrap(Wrap { trim: true })
             }
-            Message::ToolOutput(content) => Paragraph::new(content.as_str())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Plain)
-                        .style(Style::default().bg(Color::Rgb(20, 20, 40))) // Dark blue bg
-                        .title(Span::styled(
-                            "Tool Output",
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::BOLD),
-                        )),
-                )
-                .wrap(Wrap { trim: true }),
+            Message::ToolOutput(content, is_expanded) => {
+                let title = if *is_expanded {
+                    "Tool Output [Click to collapse]"
+                } else {
+                    "Tool Output [Click to expand]"
+                };
+                
+                // Process content to handle collapsed state
+                let processed_content = if *is_expanded {
+                    content.clone()
+                } else {
+                    // When collapsed, show only first 3 lines with ellipsis
+                    let lines: Vec<&str> = content.lines().collect();
+                    if lines.len() > 3 {
+                        format!("{}\n{}\n{}...", lines[0], lines[1], lines[2])
+                    } else {
+                        content.clone()
+                    }
+                };
+                
+                Paragraph::new(processed_content)
+                    .block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .border_type(BorderType::Plain)
+                            .style(Style::default().bg(Color::Rgb(20, 20, 40))) // Dark blue bg
+                            .title(Span::styled(
+                                title,
+                                Style::default()
+                                    .fg(Color::Yellow)
+                                    .add_modifier(Modifier::BOLD),
+                            )),
+                    )
+                    .wrap(Wrap { trim: true })
+            },
             Message::ToolConfirmation(calls) => {
                 let mut text = String::new();
                 for call in calls {

@@ -145,11 +145,11 @@ impl Tui {
             }
             AppEvent::ToolResult(name, result) => {
                 let msg = format!("Tool '{}' result: {}", name, result);
-                self.messages.push(Message::ToolOutput(msg));
+                self.messages.push(Message::ToolOutput(msg, false)); // Collapsed by default
             }
             AppEvent::Error(err) => {
                 self.messages
-                    .push(Message::ToolOutput(format!("Error: {}", err)));
+                    .push(Message::ToolOutput(format!("Error: {}", err), false)); // Collapsed by default
             }
             AppEvent::UserInput(_) => {}
             AppEvent::ToolApproval(_) => {}
@@ -217,14 +217,14 @@ impl Tui {
     fn handle_mouse_event(&mut self, mouse: MouseEvent) {
         match mouse.kind {
             MouseEventKind::Down(_) => {
-                // Handle mouse click to expand/collapse thinking sections
-                self.toggle_thinking_section(mouse.column, mouse.row);
+                // Handle mouse click to expand/collapse messages
+                self.toggle_message_expansion(mouse.column, mouse.row);
             }
             _ => {}
         }
     }
 
-    fn toggle_thinking_section(&mut self, column: u16, row: u16) {
+    fn toggle_message_expansion(&mut self, column: u16, row: u16) {
         // Find which message was clicked based on position
         for (message_index, area) in &self.message_positions {
             if column >= area.x
@@ -234,8 +234,14 @@ impl Tui {
             {
                 // Found the clicked message
                 if let Some(message) = self.messages.get_mut(*message_index) {
-                    if let Message::Thinking(_, _, is_expanded) = message {
-                        *is_expanded = !*is_expanded;
+                    match message {
+                        Message::Thinking(_, _, is_expanded) => {
+                            *is_expanded = !*is_expanded;
+                        }
+                        Message::ToolOutput(_, is_expanded) => {
+                            *is_expanded = !*is_expanded;
+                        }
+                        _ => {}
                     }
                 }
                 break;
@@ -273,7 +279,7 @@ fn render_chat_history(
         let width = inner_chat_area.width as usize;
         // Calculate height based on actual rendered content
         let line_count = if width > 0 {
-            // For thinking messages, calculate based on displayed content
+            // For expandable messages, calculate based on displayed content
             let display_content = match msg {
                 Message::Thinking(_, content, is_expanded) => {
                     if *is_expanded {
@@ -286,6 +292,20 @@ fn render_chat_history(
                             format!("{}\n{}\n{}...", lines[0], lines[1], lines[2])
                         } else {
                             lines.first().unwrap_or(&"Thinking...").to_string()
+                        }
+                    }
+                }
+                Message::ToolOutput(content, is_expanded) => {
+                    if *is_expanded {
+                        // Expanded tool output - show full content
+                        content.clone()
+                    } else {
+                        // Collapsed tool output - show just a preview
+                        let lines: Vec<&str> = content.lines().collect();
+                        if lines.len() > 3 {
+                            format!("{}\n{}\n{}...", lines[0], lines[1], lines[2])
+                        } else {
+                            content.clone()
                         }
                     }
                 }
