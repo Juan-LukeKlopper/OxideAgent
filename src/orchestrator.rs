@@ -7,8 +7,6 @@ use std::fs;
 use std::path::Path;
 use tokio::sync::mpsc;
 
-const SESSION_FILE: &str = "session.json";
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SessionState {
     history: Vec<ChatMessage>,
@@ -27,6 +25,7 @@ pub struct Orchestrator {
     tool_registry: ToolRegistry,
     client: Client,
     session_state: SessionState,
+    session_file: String,
     no_stream: bool,
     tx: mpsc::Sender<AppEvent>,
     rx: mpsc::Receiver<AppEvent>,
@@ -37,15 +36,22 @@ impl Orchestrator {
     pub fn new(
         agent: Agent,
         tool_registry: ToolRegistry,
+        session_name: Option<String>,
         no_stream: bool,
         tx: mpsc::Sender<AppEvent>,
         rx: mpsc::Receiver<AppEvent>,
     ) -> Self {
+        let session_file = match session_name {
+            Some(name) => format!("session_{}.json", name),
+            None => "session.json".to_string(),
+        };
+
         Self {
             agent,
             tool_registry,
             client: Client::new(),
             session_state: SessionState::new(),
+            session_file,
             no_stream,
             tx,
             rx,
@@ -53,9 +59,39 @@ impl Orchestrator {
         }
     }
 
+    pub fn list_sessions() -> anyhow::Result<Vec<String>> {
+        let mut sessions = Vec::new();
+        
+        // Check for the default session file
+        if Path::new("session.json").exists() {
+            sessions.push("default".to_string());
+        }
+        
+        // Look for named session files
+        let entries = fs::read_dir(".")?;
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            
+            if path.is_file() {
+                if let Some(file_name) = path.file_name() {
+                    if let Some(file_name_str) = file_name.to_str() {
+                        if file_name_str.starts_with("session_") && file_name_str.ends_with(".json") {
+                            // Extract session name from file name (remove "session_" prefix and ".json" suffix)
+                            let session_name = file_name_str.strip_prefix("session_").unwrap().strip_suffix(".json").unwrap();
+                            sessions.push(session_name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(sessions)
+    }
+
     pub fn load_state(&mut self) -> anyhow::Result<()> {
-        if Path::new(SESSION_FILE).exists() {
-            let session_json = fs::read_to_string(SESSION_FILE)?;
+        if Path::new(&self.session_file).exists() {
+            let session_json = fs::read_to_string(&self.session_file)?;
             if !session_json.trim().is_empty() {
                 let session_state: SessionState = serde_json::from_str(&session_json)?;
                 self.agent.history = session_state.history.clone();
@@ -68,7 +104,7 @@ impl Orchestrator {
     fn save_state(&mut self) -> anyhow::Result<()> {
         self.session_state.history = self.agent.history.clone();
         let session_json = serde_json::to_string_pretty(&self.session_state)?;
-        fs::write(SESSION_FILE, session_json)?;
+        fs::write(&self.session_file, session_json)?;
         Ok(())
     }
 

@@ -8,6 +8,12 @@ pub struct Args {
 
     #[arg(long, default_value_t = false)]
     pub no_stream: bool,
+
+    #[arg(long, help = "Specify a session name to load/save state to a named session file")]
+    pub session: Option<String>,
+
+    #[arg(long, help = "List all available sessions", default_value_t = false)]
+    pub list_sessions: bool,
 }
 
 #[derive(ValueEnum, Debug, Clone)]

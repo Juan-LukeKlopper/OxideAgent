@@ -19,6 +19,29 @@ use types::AppEvent;
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
+    // Handle session listing if requested
+    if args.list_sessions {
+        match Orchestrator::list_sessions() {
+            Ok(sessions) => {
+                if sessions.is_empty() {
+                    println!("No sessions found.");
+                } else {
+                    println!("Available sessions:");
+                    for session in sessions {
+                        println!("  - {}", session);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error listing sessions: {}", e);
+            }
+        }
+        return Ok(());
+    }
+
+    // Determine the session name for display
+    let session_name = args.session.clone().unwrap_or_else(|| "default".to_string());
+
     // Create the agent
     let agent = Agent::new(args.agent.name(), args.agent.model());
 
@@ -33,8 +56,14 @@ async fn main() -> anyhow::Result<()> {
     let (tui_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create the orchestrator
-    let mut orchestrator =
-        Orchestrator::new(agent, tool_registry, args.no_stream, orchestrator_tx, orchestrator_rx);
+    let mut orchestrator = Orchestrator::new(
+        agent,
+        tool_registry,
+        args.session,
+        args.no_stream,
+        orchestrator_tx,
+        orchestrator_rx,
+    );
 
     // Load the previous session state if it exists
     orchestrator.load_state()?;
@@ -46,8 +75,8 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Initialize and run the TUI
-    let mut tui = Tui::new(tui_rx, tui_tx)?;
+    // Initialize and run the TUI with the session name
+    let mut tui = Tui::new(tui_rx, tui_tx, session_name)?;
     tui.run().await?;
     tui.restore()?;
 

@@ -32,10 +32,11 @@ pub struct Tui {
     is_awaiting_confirmation: bool,
     // Track message positions for click detection
     message_positions: Vec<(usize, Rect)>, // (message_index, area)
+    session_name: String,
 }
 
 impl Tui {
-    pub fn new(rx: mpsc::Receiver<AppEvent>, tx: mpsc::Sender<AppEvent>) -> anyhow::Result<Self> {
+    pub fn new(rx: mpsc::Receiver<AppEvent>, tx: mpsc::Sender<AppEvent>, session_name: String) -> anyhow::Result<Self> {
         let mut stdout = io::stdout();
         enable_raw_mode()?;
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -50,11 +51,13 @@ impl Tui {
             tool_calls: Vec::new(),
             is_awaiting_confirmation: false,
             message_positions: Vec::new(),
+            session_name,
         })
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
+            let session_name = self.session_name.clone();
             self.terminal.draw(|f| {
                 self.message_positions.clear(); // Clear previous positions
                 ui(
@@ -64,6 +67,7 @@ impl Tui {
                     &self.tool_calls,
                     self.is_awaiting_confirmation,
                     &mut self.message_positions,
+                    &session_name,
                 );
             })?;
 
@@ -199,6 +203,10 @@ impl Tui {
 
         match key.code {
             KeyCode::Char('q') => return Ok(true),
+            KeyCode::Char('s') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                // Show available sessions
+                self.show_sessions()?;
+            }
             KeyCode::Enter => {
                 let user_input = self.input.value().to_string();
                 if !user_input.is_empty() {
@@ -212,6 +220,15 @@ impl Tui {
             }
         }
         Ok(false)
+    }
+
+    fn show_sessions(&mut self) -> anyhow::Result<()> {
+        // For now, just show a message that this feature is being developed
+        self.messages.push(Message::ToolOutput(
+            "Session switching feature is being developed. Use --list-sessions from command line to see available sessions.".to_string(),
+            false,
+        ));
+        Ok(())
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) {
@@ -266,8 +283,11 @@ fn render_chat_history(
     area: Rect,
     messages: &[Message],
     message_positions: &mut Vec<(usize, Rect)>,
+    session_name: &str,
 ) {
-    let chat_history_block = Block::default().title("Conversation").borders(Borders::ALL);
+    let chat_history_block = Block::default()
+        .title(format!("Conversation - Session: {}", session_name))
+        .borders(Borders::ALL);
     let inner_chat_area = chat_history_block.inner(area);
     f.render_widget(chat_history_block, area);
 
@@ -351,6 +371,7 @@ fn ui(
     tool_calls: &[crate::types::ToolCall],
     is_awaiting_confirmation: bool,
     message_positions: &mut Vec<(usize, Rect)>,
+    session_name: &str,
 ) {
     let input_height = if is_awaiting_confirmation {
         let mut text = String::new();
@@ -382,7 +403,7 @@ fn ui(
         .constraints([Constraint::Min(0), Constraint::Length(input_height)].as_ref())
         .split(f.area());
 
-    render_chat_history(f, chunks[0], messages, message_positions);
+    render_chat_history(f, chunks[0], messages, message_positions, session_name);
     render_input_box(f, chunks[1], input, tool_calls, is_awaiting_confirmation);
 }
 
@@ -396,7 +417,7 @@ fn render_input_box(
     let title = if is_awaiting_confirmation {
         "Approve tool call? (1: Allow, 2: Always Allow, 3: Always Allow (Session), 4: Deny)"
     } else {
-        "Input (Press 'q' to quit)"
+        "Input (Press 'q' to quit, Ctrl+s to switch sessions)"
     };
 
     let block = Block::default().title(title).borders(Borders::ALL);
