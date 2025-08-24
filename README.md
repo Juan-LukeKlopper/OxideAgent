@@ -18,6 +18,8 @@ OxideAgent is a Rust-based AI agent that allows you to chat with local language 
 *   **Tool Approval System:** A security-focused workflow requires user approval before executing any tool.
 *   **Advanced TUI Interface:** Features a Terminal User Interface with collapsible sections for reasoning and tool outputs.
 *   **Thinking Process Visualization:** Clearly separates agent reasoning from final responses with expandable/collapsible sections.
+*   **Multi-Session Management:** Create and switch between multiple named sessions with persistent history.
+*   **Session History Restoration:** Automatically restores previous conversations when loading a session.
 
 ## Getting Started
 
@@ -67,13 +69,21 @@ To see a list of available agents, use the `--help` flag:
 cargo run -- --help
 ```
 
-To exit the chat, type `/exit`.
+To exit the chat, press `Ctrl+q`.
 
 ### Available Agents
 
 1.  **Qwen** (`--agent qwen`): Uses the `qwen3:4b` model. The default agent.
 2.  **Llama** (`--agent llama`): Uses the `llama3.2` model.
 3.  **Granite** (`--agent granite`): Uses the `granite3.3` model.
+
+### Multi-Session Management
+
+OxideAgent supports multiple named sessions, allowing you to work on different tasks simultaneously:
+
+*   Start a named session: `cargo run -- --session my_project`
+*   List all sessions: `cargo run -- --list-sessions`
+*   Switch between sessions within the TUI using `/switch session_name`
 
 ### Tool Capabilities
 
@@ -94,6 +104,25 @@ The Terminal User Interface provides an enhanced chat experience with several ad
 *   **Real-time Streaming**: Watch responses appear character-by-character as they're generated
 *   **Mouse Support**: Click on section headers to expand or collapse content
 *   **Improved Layout**: Better organized chat history with clear visual separation between different message types
+*   **Session Management**: View and switch between sessions directly from the TUI
+*   **Help System**: Press `Ctrl+o` to display all available commands and shortcuts
+
+### TUI Keyboard Shortcuts
+
+*   **Ctrl+q**: Quit the application
+*   **Ctrl+s**: List available sessions
+*   **Ctrl+o**: Show help message with all commands
+*   **Mouse Click**: Expand/collapse reasoning and tool output sections
+*   **Tool Approval Options** (when prompted):
+    *   1: Allow tool execution
+    *   2: Always allow this tool
+    *   3: Always allow this tool for this session
+    *   4: Deny tool execution
+
+### Session Commands
+
+*   **/switch <session_name>**: Switch to a different session from within the TUI
+*   **Ctrl+s**: List all available sessions
 
 ## Project Roadmap
 
@@ -104,9 +133,10 @@ The project has a solid foundation with the following features already implement
 *   A "smart" native tool-calling system
 *   An orchestrator with persistent memory for resumable sessions
 *   Advanced TUI with collapsible sections for better visualization
+*   Multi-session management with named sessions
+*   Session history restoration
 
 Future development will focus on expanding the agent's capabilities:
-*   **Multi-Session Management:** Allow for creating and switching between multiple named sessions.
 *   **MCP Server Integration:** Connect to Model Context Protocol servers for advanced tooling.
 *   **Smart Tool & Prompt Inclusion:** Dynamically select tools and system prompts based on the agent's task.
 *   **Advanced Workflow Management:** Handle complex, multi-step operations with better planning and error handling.
