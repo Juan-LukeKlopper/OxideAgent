@@ -192,7 +192,8 @@ impl Tui {
             AppEvent::AgentMessage(content) => {
                 // Check if this is a session list message
                 if content.starts_with("Available sessions:") {
-                    self.messages.push(Message::ToolOutput(content, false));
+                    // Show session list expanded by default
+                    self.messages.push(Message::ToolOutput(content, true));
                 } else {
                     self.messages
                         .push(Message::Agent(crate::agents::AgentId::Ollama, content));
@@ -337,7 +338,7 @@ Tool approval options (when prompted):
 - 4: Deny tool execution"#;
 
         self.messages
-            .push(Message::ToolOutput(help_text.to_string(), false));
+            .push(Message::ToolOutput(help_text.to_string(), true));
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) {
