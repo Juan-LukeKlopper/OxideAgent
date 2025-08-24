@@ -68,6 +68,9 @@ async fn main() -> anyhow::Result<()> {
     // Load the previous session state if it exists
     orchestrator.load_state()?;
 
+    // Get the session history to pass to the TUI
+    let session_history = orchestrator.get_session_history().clone();
+
     // Run the orchestrator in a separate task
     tokio::spawn(async move {
         if let Err(e) = orchestrator.run().await {
@@ -75,8 +78,8 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Initialize and run the TUI with the session name
-    let mut tui = Tui::new(tui_rx, tui_tx, session_name)?;
+    // Initialize and run the TUI with the session name and history
+    let mut tui = Tui::new(tui_rx, tui_tx, session_name, session_history)?;
     tui.run().await?;
     tui.restore()?;
 

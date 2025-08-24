@@ -1,4 +1,4 @@
-use crate::types::{AppEvent, ToolApprovalResponse};
+use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse};
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, MouseEvent,
@@ -36,23 +36,74 @@ pub struct Tui {
 }
 
 impl Tui {
-    pub fn new(rx: mpsc::Receiver<AppEvent>, tx: mpsc::Sender<AppEvent>, session_name: String) -> anyhow::Result<Self> {
+    pub fn new(
+        rx: mpsc::Receiver<AppEvent>,
+        tx: mpsc::Sender<AppEvent>,
+        session_name: String,
+        session_history: Vec<ChatMessage>,
+    ) -> anyhow::Result<Self> {
         let mut stdout = io::stdout();
         enable_raw_mode()?;
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;
+
+        // Convert session history to TUI messages
+        let messages = Self::convert_history_to_messages(session_history);
+
         Ok(Self {
             terminal,
             rx,
             tx,
-            messages: Vec::new(),
+            messages,
             input: Input::default(),
             tool_calls: Vec::new(),
             is_awaiting_confirmation: false,
             message_positions: Vec::new(),
             session_name,
         })
+    }
+
+    fn convert_history_to_messages(history: Vec<ChatMessage>) -> Vec<Message> {
+        let mut messages = Vec::new();
+
+        for chat_message in history {
+            match chat_message.role.as_str() {
+                "user" => {
+                    messages.push(Message::User(chat_message.content));
+                }
+                "assistant" => {
+                    // Check if this is a thinking message (contains the special markers)
+                    if chat_message.content.trim_start().starts_with("<tool_call>") {
+                        // This is a thinking message, show it collapsed by default
+                        messages.push(Message::Thinking(
+                            crate::agents::AgentId::Ollama,
+                            chat_message.content,
+                            false, // collapsed by default
+                        ));
+                    } else {
+                        // Regular assistant message
+                        messages.push(Message::Agent(
+                            crate::agents::AgentId::Ollama,
+                            chat_message.content,
+                        ));
+                    }
+                }
+                "system" => {
+                    // We typically don't display system messages in the UI
+                    // But we could if needed
+                }
+                _ => {
+                    // Handle any other message types
+                    messages.push(Message::ToolOutput(
+                        format!("Unknown message type: {}", chat_message.role),
+                        false,
+                    ));
+                }
+            }
+        }
+
+        messages
     }
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
@@ -139,8 +190,13 @@ impl Tui {
                 }
             }
             AppEvent::AgentMessage(content) => {
-                self.messages
-                    .push(Message::Agent(crate::agents::AgentId::Ollama, content));
+                // Check if this is a session list message
+                if content.starts_with("Available sessions:") {
+                    self.messages.push(Message::ToolOutput(content, false));
+                } else {
+                    self.messages
+                        .push(Message::Agent(crate::agents::AgentId::Ollama, content));
+                }
             }
             AppEvent::ToolRequest(calls) => {
                 self.tool_calls = calls.clone();
@@ -157,6 +213,31 @@ impl Tui {
             }
             AppEvent::UserInput(_) => {}
             AppEvent::ToolApproval(_) => {}
+            AppEvent::SessionSwitched(session_name) => {
+                // Update the session name
+                self.session_name = session_name;
+                // Clear the current messages
+                self.messages.clear();
+                // Add a message to indicate the session switch
+                self.messages.push(Message::ToolOutput(
+                    format!(
+                        "Switched to session: {}\nSession history has been restored.",
+                        self.session_name
+                    ),
+                    false,
+                ));
+            }
+            AppEvent::SessionHistory(history) => {
+                // Convert and add the session history to the messages
+                let history_messages = Self::convert_history_to_messages(history);
+                self.messages.extend(history_messages);
+            }
+            AppEvent::SwitchSession(_) => {
+                // This event is sent to the orchestrator, not handled here
+            }
+            AppEvent::ListSessions => {
+                // This event is sent to the orchestrator, not handled here
+            }
         }
         Ok(())
     }
@@ -202,16 +283,29 @@ impl Tui {
         }
 
         match key.code {
-            KeyCode::Char('q') => return Ok(true),
+            KeyCode::Char('q') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                return Ok(true);
+            }
+            KeyCode::Char('o') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                // Show help
+                self.show_help();
+            }
             KeyCode::Char('s') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
                 // Show available sessions
-                self.show_sessions()?;
+                self.show_sessions().await?;
             }
             KeyCode::Enter => {
                 let user_input = self.input.value().to_string();
                 if !user_input.is_empty() {
-                    self.messages.push(Message::User(user_input.clone()));
-                    self.tx.send(AppEvent::UserInput(user_input)).await?;
+                    // Check if this is a session switch command
+                    if user_input.starts_with("/switch ") {
+                        let session_name = user_input[8..].trim().to_string();
+                        self.tx.send(AppEvent::SwitchSession(session_name)).await?;
+                        self.messages.push(Message::User(user_input.clone()));
+                    } else {
+                        self.messages.push(Message::User(user_input.clone()));
+                        self.tx.send(AppEvent::UserInput(user_input)).await?;
+                    }
                     self.input.reset();
                 }
             }
@@ -222,13 +316,28 @@ impl Tui {
         Ok(false)
     }
 
-    fn show_sessions(&mut self) -> anyhow::Result<()> {
-        // For now, just show a message that this feature is being developed
-        self.messages.push(Message::ToolOutput(
-            "Session switching feature is being developed. Use --list-sessions from command line to see available sessions.".to_string(),
-            false,
-        ));
+    async fn show_sessions(&mut self) -> anyhow::Result<()> {
+        // Send event to orchestrator to list sessions
+        self.tx.send(AppEvent::ListSessions).await?;
         Ok(())
+    }
+
+    fn show_help(&mut self) {
+        let help_text = r#"Available commands:
+- Ctrl+q: Quit the application
+- Ctrl+s: List available sessions
+- Ctrl+o: Show this help message
+- /switch <session_name>: Switch to a different session
+- Type your message and press Enter to chat
+
+Tool approval options (when prompted):
+- 1: Allow tool execution
+- 2: Always allow this tool
+- 3: Always allow this tool for this session
+- 4: Deny tool execution"#;
+
+        self.messages
+            .push(Message::ToolOutput(help_text.to_string(), false));
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) {
@@ -329,17 +438,20 @@ fn render_chat_history(
                         }
                     }
                 }
-                _ => content.clone()
+                _ => content.clone(),
             };
-            
+
             // Count wrapped lines more accurately
-            display_content.lines().map(|line| {
-                if line.is_empty() {
-                    1
-                } else {
-                    (line.chars().count() / width.max(1)) + 1
-                }
-            }).sum::<usize>()
+            display_content
+                .lines()
+                .map(|line| {
+                    if line.is_empty() {
+                        1
+                    } else {
+                        (line.chars().count() / width.max(1)) + 1
+                    }
+                })
+                .sum::<usize>()
         } else {
             content.lines().count()
         };
@@ -417,7 +529,7 @@ fn render_input_box(
     let title = if is_awaiting_confirmation {
         "Approve tool call? (1: Allow, 2: Always Allow, 3: Always Allow (Session), 4: Deny)"
     } else {
-        "Input (Press 'q' to quit, Ctrl+s to switch sessions)"
+        "Input (Press Ctrl+q to quit, Ctrl+o for help)"
     };
 
     let block = Block::default().title(title).borders(Borders::ALL);

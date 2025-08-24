@@ -108,6 +108,26 @@ impl Orchestrator {
         Ok(())
     }
 
+    pub fn switch_session(&mut self, session_name: Option<String>) -> anyhow::Result<()> {
+        // Save current state first
+        self.save_state()?;
+        
+        // Update session file name
+        self.session_file = match &session_name {
+            Some(name) => format!("session_{}.json", name),
+            None => "session.json".to_string(),
+        };
+        
+        // Reset agent history
+        self.agent.history.clear();
+        self.session_state = SessionState::new();
+        
+        // Load new session
+        self.load_state()?;
+        
+        Ok(())
+    }
+
     pub async fn run(&mut self) -> anyhow::Result<()> {
         while let Some(event) = self.rx.recv().await {
             match event {
@@ -119,6 +139,37 @@ impl Orchestrator {
                 AppEvent::ToolApproval(response) => {
                     if let Err(e) = self.handle_tool_approval(response).await {
                         self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    }
+                }
+                AppEvent::SwitchSession(session_name) => {
+                    let session_opt = if session_name == "default" {
+                        None
+                    } else {
+                        Some(session_name)
+                    };
+                    
+                    // Clone the session_opt for the display name before moving it
+                    let display_name = session_opt.clone().unwrap_or_else(|| "default".to_string());
+                    
+                    if let Err(e) = self.switch_session(session_opt) {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    } else {
+                        // Notify TUI that session has been switched
+                        self.tx.send(AppEvent::SessionSwitched(display_name)).await?;
+                        
+                        // Send the session history to the TUI
+                        self.tx.send(AppEvent::SessionHistory(self.get_session_history().clone())).await?;
+                    }
+                }
+                AppEvent::ListSessions => {
+                    match Orchestrator::list_sessions() {
+                        Ok(sessions) => {
+                            let session_list = sessions.join(", ");
+                            self.tx.send(AppEvent::AgentMessage(format!("Available sessions: {}", session_list))).await?;
+                        }
+                        Err(e) => {
+                            self.tx.send(AppEvent::Error(e.to_string())).await?;
+                        }
                     }
                 }
                 _ => {}
@@ -216,11 +267,15 @@ impl Orchestrator {
 
     async fn execute_tool(&self, tool_call: &ToolCall) -> anyhow::Result<String> {
         if let Some(tool) = self.tool_registry.get_tool(&tool_call.function.name) {
-            tool.execute(&tool_call.function.arguments)
+            return tool.execute(&tool_call.function.arguments);
         } else {
             let error_msg = format!("Unknown tool: {}", tool_call.function.name);
             self.tx.send(AppEvent::Error(error_msg.clone())).await?;
-            Err(anyhow::anyhow!(error_msg))
+            return Err(anyhow::anyhow!(error_msg));
         }
+    }
+
+    pub fn get_session_history(&self) -> &Vec<ChatMessage> {
+        &self.agent.history
     }
 }

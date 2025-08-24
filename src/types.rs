@@ -19,6 +19,10 @@ pub enum AppEvent {
     ToolRequest(Vec<ToolCall>),
     ToolResult(String, String),
     Error(String),
+    SwitchSession(String), // New event for switching sessions
+    ListSessions, // New event for listing sessions
+    SessionSwitched(String), // New event to notify TUI that session has been switched
+    SessionHistory(Vec<ChatMessage>), // New event to send session history to TUI
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
