@@ -161,6 +161,27 @@ impl Orchestrator {
                         self.tx.send(AppEvent::SessionHistory(self.get_session_history().clone())).await?;
                     }
                 }
+                AppEvent::SwitchAgent(agent_name) => {
+                    // Create a new agent with the specified name
+                    let agent_type = match agent_name.as_str() {
+                        "Qwen" => crate::cli::AgentType::Qwen,
+                        "Llama" => crate::cli::AgentType::Llama,
+                        "Granite" => crate::cli::AgentType::Granite,
+                        _ => {
+                            self.tx.send(AppEvent::Error(format!("Unknown agent: {}", agent_name))).await?;
+                            continue;
+                        }
+                    };
+                    
+                    // Create new agent
+                    let new_agent = crate::agents::Agent::new(agent_type.name(), agent_type.model());
+                    
+                    // Replace the current agent
+                    self.agent = new_agent;
+                    
+                    // Notify TUI that agent has been switched
+                    self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
+                }
                 AppEvent::ListSessions => {
                     match Orchestrator::list_sessions() {
                         Ok(sessions) => {

@@ -3,11 +3,20 @@ use serde_json::{json, Value};
 use std::fs;
 use std::process::Command;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolProfile {
+    File,
+    Shell,
+    Web,
+    Generic,
+}
+
 // The main trait for any tool that can be executed by the agent.
 pub trait Tool: Send + Sync {
     fn name(&self) -> String;
     fn description(&self) -> String;
     fn parameters(&self) -> Value;
+    fn profile(&self) -> ToolProfile;
     fn execute(&self, args: &Value) -> anyhow::Result<String>;
 
     // Provides the full tool definition for the Ollama API.
@@ -36,6 +45,14 @@ impl ToolRegistry {
 
     pub fn definitions(&self) -> Vec<ApiTool> {
         self.tools.iter().map(|t| t.definition()).collect()
+    }
+
+    pub fn definitions_with_profiles(&self, profiles: &[ToolProfile]) -> Vec<ApiTool> {
+        self.tools
+            .iter()
+            .filter(|t| profiles.contains(&t.profile()))
+            .map(|t| t.definition())
+            .collect()
     }
 }
 
@@ -66,6 +83,10 @@ impl Tool for WriteFileTool {
             },
             "required": ["path", "content"]
         })
+    }
+
+    fn profile(&self) -> ToolProfile {
+        ToolProfile::File
     }
 
     fn execute(&self, args: &Value) -> anyhow::Result<String> {
@@ -104,6 +125,10 @@ impl Tool for ReadFileTool {
         })
     }
 
+    fn profile(&self) -> ToolProfile {
+        ToolProfile::File
+    }
+
     fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let path = args["path"].as_str().unwrap_or("");
         if path.is_empty() {
@@ -137,6 +162,10 @@ impl Tool for RunShellCommandTool {
             },
             "required": ["command"]
         })
+    }
+
+    fn profile(&self) -> ToolProfile {
+        ToolProfile::Shell
     }
 
     fn execute(&self, args: &Value) -> anyhow::Result<String> {

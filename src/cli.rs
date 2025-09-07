@@ -14,6 +14,12 @@ pub struct Args {
 
     #[arg(long, help = "List all available sessions", default_value_t = false)]
     pub list_sessions: bool,
+
+    #[arg(long, help = "URL of an MCP server to connect to")]
+    pub mcp_server: Option<String>,
+
+    #[arg(long, help = "Authentication token for the MCP server")]
+    pub mcp_auth_token: Option<String>,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -37,6 +43,14 @@ impl AgentType {
             AgentType::Qwen => "Qwen",
             AgentType::Llama => "Llama",
             AgentType::Granite => "Granite",
+        }
+    }
+
+    pub fn system_prompt(&self) -> &'static str {
+        match self {
+            AgentType::Qwen => "You are a Rust programming expert.",
+            AgentType::Llama => "You are a helpful assistant.",
+            AgentType::Granite => "You are a helpful assistant.",
         }
     }
 }

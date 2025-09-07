@@ -20,6 +20,7 @@ pub enum AppEvent {
     ToolResult(String, String),
     Error(String),
     SwitchSession(String), // New event for switching sessions
+    SwitchAgent(String), // New event for switching agents
     ListSessions, // New event for listing sessions
     SessionSwitched(String), // New event to notify TUI that session has been switched
     SessionHistory(Vec<ChatMessage>), // New event to send session history to TUI

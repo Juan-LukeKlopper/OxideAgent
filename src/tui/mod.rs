@@ -1,4 +1,5 @@
-use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse};
+use crate::agents::AgentId;
+use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, MouseEvent,
@@ -11,6 +12,7 @@ use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Position, Rect},
+    style::{Color, Style},
     widgets::{Block, Borders, Paragraph, Wrap},
 };
 use std::io;
@@ -22,17 +24,32 @@ use tui_input::backend::crossterm::EventHandler;
 pub mod message;
 use message::Message;
 
+// TODO: Add state for tracking selected item in switcher overlay
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SwitcherSelection {
+    Agent(usize),   // Index of selected agent
+    Session(usize), // Index of selected session
+}
+
 pub struct Tui {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     rx: mpsc::Receiver<AppEvent>,
     tx: mpsc::Sender<AppEvent>,
     messages: Vec<Message>,
+    status_messages: Vec<String>,
     input: Input,
-    tool_calls: Vec<crate::types::ToolCall>,
+    tool_calls: Vec<ToolCall>,
     is_awaiting_confirmation: bool,
+    show_status_overlay: bool,
+    show_switcher_overlay: bool,
+    current_agent: String,
+    available_agents: Vec<String>,
     // Track message positions for click detection
     message_positions: Vec<(usize, Rect)>, // (message_index, area)
     session_name: String,
+    // Track selection state for switcher navigation
+    switcher_selection: SwitcherSelection,
+    available_sessions: Vec<String>,
 }
 
 impl Tui {
@@ -51,16 +68,30 @@ impl Tui {
         // Convert session history to TUI messages
         let messages = Self::convert_history_to_messages(session_history);
 
+        // Get available sessions from orchestrator
+        let available_sessions = match crate::orchestrator::Orchestrator::list_sessions() {
+            Ok(sessions) => sessions,
+            Err(_) => vec!["default".to_string()], // Fallback to default if listing fails
+        };
+
         Ok(Self {
             terminal,
             rx,
             tx,
             messages,
+            status_messages: Vec::new(),
             input: Input::default(),
             tool_calls: Vec::new(),
             is_awaiting_confirmation: false,
+            show_status_overlay: false,
+            show_switcher_overlay: false,
+            current_agent: session_name.clone(),
+            available_agents: vec!["Qwen".to_string(), "Llama".to_string(), "Granite".to_string()],
             message_positions: Vec::new(),
             session_name,
+            // Initialize switcher selection state
+            switcher_selection: SwitcherSelection::Agent(0),
+            available_sessions,
         })
     }
 
@@ -74,19 +105,16 @@ impl Tui {
                 }
                 "assistant" => {
                     // Check if this is a thinking message (contains the special markers)
-                    if chat_message.content.trim_start().starts_with("<tool_call>") {
+                    if chat_message.content.trim_start().starts_with("####") {
                         // This is a thinking message, show it collapsed by default
                         messages.push(Message::Thinking(
-                            crate::agents::AgentId::Ollama,
+                            AgentId::Ollama,
                             chat_message.content,
                             false, // collapsed by default
                         ));
                     } else {
                         // Regular assistant message
-                        messages.push(Message::Agent(
-                            crate::agents::AgentId::Ollama,
-                            chat_message.content,
-                        ));
+                        messages.push(Message::Agent(AgentId::Ollama, chat_message.content));
                     }
                 }
                 "system" => {
@@ -108,7 +136,6 @@ impl Tui {
 
     pub async fn run(&mut self) -> anyhow::Result<()> {
         loop {
-            let session_name = self.session_name.clone();
             self.terminal.draw(|f| {
                 self.message_positions.clear(); // Clear previous positions
                 ui(
@@ -118,7 +145,14 @@ impl Tui {
                     &self.tool_calls,
                     self.is_awaiting_confirmation,
                     &mut self.message_positions,
-                    &session_name,
+                    &self.session_name,
+                    &self.status_messages,
+                    self.show_status_overlay,
+                    self.show_switcher_overlay,
+                    &self.current_agent,
+                    &self.available_agents,
+                    self.switcher_selection,
+                    &self.available_sessions,
                 );
             })?;
 
@@ -147,20 +181,17 @@ impl Tui {
         match event {
             AppEvent::AgentStreamChunk(chunk) => {
                 if !chunk.is_empty() {
-                    // Check if this is the start of a thinking section (starts with <think>)
-                    if chunk.trim_start().starts_with("<think>") {
+                    // Check if this is the start of a thinking section (starts with ####)
+                    if chunk.trim_start().starts_with("####") {
                         // Create a new thinking message, expanded by default
-                        self.messages.push(Message::Thinking(
-                            crate::agents::AgentId::Ollama,
-                            chunk,
-                            true,
-                        ));
+                        self.messages
+                            .push(Message::Thinking(AgentId::Ollama, chunk, true));
                     } else if let Some(last_message) = self.messages.last_mut() {
                         match last_message {
                             Message::Thinking(_, content, is_expanded) => {
                                 content.push_str(&chunk);
-                                // Check if this is the end of a thinking section (ends with </think>)
-                                if chunk.trim_end().ends_with("</think>") {
+                                // Check if this is the end of a thinking section (ends with ####)
+                                if chunk.trim_end().ends_with("####") {
                                     // Collapse the thinking section by default after it's complete
                                     *is_expanded = false;
                                 }
@@ -170,14 +201,12 @@ impl Tui {
                             }
                             _ => {
                                 // Create a new agent message if the last message wasn't a thinking or agent message
-                                self.messages
-                                    .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
+                                self.messages.push(Message::Agent(AgentId::Ollama, chunk));
                             }
                         }
                     } else {
                         // Create a new agent message if there are no previous messages
-                        self.messages
-                            .push(Message::Agent(crate::agents::AgentId::Ollama, chunk));
+                        self.messages.push(Message::Agent(AgentId::Ollama, chunk));
                     }
                 }
             }
@@ -193,10 +222,14 @@ impl Tui {
                 // Check if this is a session list message
                 if content.starts_with("Available sessions:") {
                     // Show session list expanded by default
-                    self.messages.push(Message::ToolOutput(content, true));
+                    self.messages.push(Message::ToolOutput(content.clone(), true));
+                    // Parse session list and update available_sessions
+                    if let Some(sessions_str) = content.strip_prefix("Available sessions: ") {
+                        let sessions: Vec<String> = sessions_str.split(", ").map(|s| s.to_string()).collect();
+                        self.available_sessions = sessions;
+                    }
                 } else {
-                    self.messages
-                        .push(Message::Agent(crate::agents::AgentId::Ollama, content));
+                    self.messages.push(Message::Agent(AgentId::Ollama, content));
                 }
             }
             AppEvent::ToolRequest(calls) => {
@@ -227,6 +260,16 @@ impl Tui {
                     ),
                     false,
                 ));
+                // Refresh session list to include the new session
+                match crate::orchestrator::Orchestrator::list_sessions() {
+                    Ok(sessions) => self.available_sessions = sessions,
+                    Err(_) => {
+                        // If listing fails, at least ensure current session is in the list
+                        if !self.available_sessions.contains(&self.session_name) {
+                            self.available_sessions.push(self.session_name.clone());
+                        }
+                    }
+                }
             }
             AppEvent::SessionHistory(history) => {
                 // Convert and add the session history to the messages
@@ -236,14 +279,56 @@ impl Tui {
             AppEvent::SwitchSession(_) => {
                 // This event is sent to the orchestrator, not handled here
             }
+            AppEvent::SwitchAgent(agent_name) => {
+                // Update the current agent name
+                self.current_agent = agent_name.clone();
+                // Add a message to indicate the agent switch
+                self.messages.push(Message::ToolOutput(
+                    format!("Switched to agent: {}", agent_name),
+                    false,
+                ));
+            }
             AppEvent::ListSessions => {
                 // This event is sent to the orchestrator, not handled here
+                // When the orchestrator responds with session list, it will be in AgentMessage
+                // TODO: Handle list sessions response to update available_sessions
             }
         }
         Ok(())
     }
 
     async fn handle_key_event(&mut self, key: KeyEvent) -> anyhow::Result<bool> {
+        // TODO: Handle navigation in switcher overlay
+        if self.show_switcher_overlay {
+            match key.code {
+                KeyCode::Char('q') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                    self.show_switcher_overlay = false;
+                    return Ok(false);
+                }
+                KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                    self.show_switcher_overlay = false;
+                    return Ok(false);
+                }
+                KeyCode::Esc => {
+                    self.show_switcher_overlay = false;
+                    return Ok(false);
+                }
+                KeyCode::Up => {
+                    self.navigate_switcher_up();
+                    return Ok(false);
+                }
+                KeyCode::Down => {
+                    self.navigate_switcher_down();
+                    return Ok(false);
+                }
+                KeyCode::Enter => {
+                    self.select_switcher_item().await?;
+                    return Ok(false);
+                }
+                _ => {}
+            }
+        }
+
         if self.is_awaiting_confirmation {
             match key.code {
                 KeyCode::Char('1') => {
@@ -291,9 +376,15 @@ impl Tui {
                 // Show help
                 self.show_help();
             }
-            KeyCode::Char('s') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
-                // Show available sessions
-                self.show_sessions().await?;
+            KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
+                // Toggle switcher overlay
+                self.show_switcher_overlay = !self.show_switcher_overlay;
+                // Reset selection when opening
+                if self.show_switcher_overlay {
+                    self.switcher_selection = SwitcherSelection::Agent(0);
+                    // Request updated session list
+                    self.tx.send(AppEvent::ListSessions).await?;
+                }
             }
             KeyCode::Enter => {
                 let user_input = self.input.value().to_string();
@@ -317,6 +408,85 @@ impl Tui {
         Ok(false)
     }
 
+    // Implement switcher navigation methods
+    fn navigate_switcher_up(&mut self) {
+        match self.switcher_selection {
+            SwitcherSelection::Agent(idx) => {
+                if idx > 0 {
+                    self.switcher_selection = SwitcherSelection::Agent(idx - 1);
+                } else {
+                    // Move to last session
+                    self.switcher_selection =
+                        SwitcherSelection::Session(self.available_sessions.len().saturating_sub(1));
+                }
+            }
+            SwitcherSelection::Session(idx) => {
+                if idx > 0 {
+                    self.switcher_selection = SwitcherSelection::Session(idx - 1);
+                } else {
+                    // Move to last agent
+                    self.switcher_selection =
+                        SwitcherSelection::Agent(self.available_agents.len().saturating_sub(1));
+                }
+            }
+        }
+    }
+
+    fn navigate_switcher_down(&mut self) {
+        match self.switcher_selection {
+            SwitcherSelection::Agent(idx) => {
+                if idx + 1 < self.available_agents.len() {
+                    self.switcher_selection = SwitcherSelection::Agent(idx + 1);
+                } else {
+                    // Move to first session
+                    self.switcher_selection = SwitcherSelection::Session(0);
+                }
+            }
+            SwitcherSelection::Session(idx) => {
+                if idx + 1 < self.available_sessions.len() {
+                    self.switcher_selection = SwitcherSelection::Session(idx + 1);
+                } else {
+                    // Move to first agent
+                    self.switcher_selection = SwitcherSelection::Agent(0);
+                }
+            }
+        }
+    }
+
+    async fn select_switcher_item(&mut self) -> anyhow::Result<()> {
+        match self.switcher_selection {
+            SwitcherSelection::Agent(idx) => {
+                if idx < self.available_agents.len() {
+                    let selected_agent = &self.available_agents[idx];
+                    if selected_agent != &self.current_agent {
+                        // Send switch agent event to orchestrator
+                        self.tx
+                            .send(AppEvent::SwitchAgent(selected_agent.clone()))
+                            .await?;
+                        self.messages.push(Message::User(format!("/switch agent {}", selected_agent)));
+                        // Update the current agent locally
+                        self.current_agent = selected_agent.clone();
+                    }
+                }
+            }
+            SwitcherSelection::Session(idx) => {
+                if idx < self.available_sessions.len() {
+                    let selected_session = &self.available_sessions[idx];
+                    if selected_session != &self.session_name {
+                        // Send switch session event
+                        self.tx
+                            .send(AppEvent::SwitchSession(selected_session.clone()))
+                            .await?;
+                        self.messages
+                            .push(Message::User(format!("/switch {}", selected_session)));
+                    }
+                }
+            }
+        }
+        self.show_switcher_overlay = false;
+        Ok(())
+    }
+
     async fn show_sessions(&mut self) -> anyhow::Result<()> {
         // Send event to orchestrator to list sessions
         self.tx.send(AppEvent::ListSessions).await?;
@@ -326,7 +496,7 @@ impl Tui {
     fn show_help(&mut self) {
         let help_text = r#"Available commands:
 - Ctrl+q: Quit the application
-- Ctrl+s: List available sessions
+- Ctrl+a: Toggle agent/session switcher
 - Ctrl+o: Show this help message
 - /switch <session_name>: Switch to a different session
 - Type your message and press Enter to chat
@@ -481,50 +651,146 @@ fn ui(
     f: &mut Frame,
     messages: &[Message],
     input: &Input,
-    tool_calls: &[crate::types::ToolCall],
+    tool_calls: &[ToolCall],
     is_awaiting_confirmation: bool,
     message_positions: &mut Vec<(usize, Rect)>,
     session_name: &str,
+    _status_messages: &[String],
+    _show_status_overlay: bool,
+    show_switcher_overlay: bool,
+    current_agent: &str,
+    available_agents: &[String],
+    switcher_selection: SwitcherSelection,
+    available_sessions: &[String],
 ) {
-    let input_height = if is_awaiting_confirmation {
-        let mut text = String::new();
-        for call in tool_calls {
-            text.push_str(&format!("Tool: {}\n", call.function.name));
-            text.push_str(&format!(
-                "Arguments: {}\n\n",
-                serde_json::to_string_pretty(&call.function.arguments)
-                    .unwrap_or_else(|_| "Invalid JSON".to_string())
-            ));
-        }
-        let width = f.area().width.saturating_sub(4) as usize;
-        let mut num_lines = 0;
-        for line in text.lines() {
-            num_lines += (line.len() / width) + 1;
-        }
-        num_lines as u16 + 2
-    } else if input.value().is_empty() {
-        3
+    if show_switcher_overlay {
+        // Multipane layout with switcher panel
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints(
+                [
+                    Constraint::Min(0),     // Chat history (shrunk)
+                    Constraint::Length(15), // Switcher panel
+                    Constraint::Length(3),  // Input box
+                ]
+                .as_ref(),
+            )
+            .split(f.area());
+
+        render_chat_history(f, chunks[0], messages, message_positions, session_name);
+        render_switcher_panel(
+            f,
+            chunks[1],
+            current_agent,
+            available_agents,
+            session_name,
+            available_sessions,
+            switcher_selection,
+        );
+        render_input_box(f, chunks[2], input, tool_calls, is_awaiting_confirmation);
     } else {
-        let width = f.area().width as usize - 4;
-        let lines = input.value().len() / width + 1;
-        lines as u16 + 2
-    };
+        // Normal layout
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
+            .split(f.area());
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints([Constraint::Min(0), Constraint::Length(input_height)].as_ref())
-        .split(f.area());
+        render_chat_history(f, chunks[0], messages, message_positions, session_name);
+        render_input_box(f, chunks[1], input, tool_calls, is_awaiting_confirmation);
+    }
+}
 
-    render_chat_history(f, chunks[0], messages, message_positions, session_name);
-    render_input_box(f, chunks[1], input, tool_calls, is_awaiting_confirmation);
+fn render_switcher_panel(
+    f: &mut Frame,
+    area: Rect,
+    current_agent: &str,
+    available_agents: &[String],
+    current_session: &str,
+    available_sessions: &[String],
+    switcher_selection: SwitcherSelection,
+) {
+    let block = Block::default()
+        .title("Switch Agent/Session (Press Ctrl+a or Esc to close)")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Yellow))
+        .style(Style::default().bg(Color::Rgb(20, 20, 35))); // Solid dark background
+
+    let inner_area = block.inner(area);
+    f.render_widget(block, area);
+
+    // Render available agents
+    let mut text = String::new();
+    text.push_str("Available Agents:\n");
+
+    for (idx, agent) in available_agents.iter().enumerate() {
+        let is_selected = match switcher_selection {
+            SwitcherSelection::Agent(selected_idx) => selected_idx == idx,
+            _ => false,
+        };
+
+        if agent == current_agent {
+            if is_selected {
+                // Highlight current selected agent with bright color
+                text.push_str(&format!("  -> [{}] (current, selected)\n", agent));
+            } else {
+                // Highlight current agent
+                text.push_str(&format!("     {} (current)\n", agent));
+            }
+        } else {
+            if is_selected {
+                // Highlight selected agent with bright color
+                text.push_str(&format!("  -> [{}]\n", agent));
+            } else {
+                text.push_str(&format!("     {}\n", agent));
+            }
+        }
+    }
+
+    text.push_str("\nAvailable Sessions:\n");
+
+    // Render available sessions
+    for (idx, session) in available_sessions.iter().enumerate() {
+        let is_selected = match switcher_selection {
+            SwitcherSelection::Session(selected_idx) => selected_idx == idx,
+            _ => false,
+        };
+
+        if session == current_session {
+            if is_selected {
+                // Highlight current selected session with bright color
+                text.push_str(&format!("  -> [{}] (current, selected)\n", session));
+            } else {
+                // Highlight current session
+                text.push_str(&format!("     {} (current)\n", session));
+            }
+        } else {
+            if is_selected {
+                // Highlight selected session with bright color
+                text.push_str(&format!("  -> [{}]\n", session));
+            } else {
+                text.push_str(&format!("     {}\n", session));
+            }
+        }
+    }
+
+    text.push_str("\nUse Up/Down arrows to navigate, Enter to select.\n");
+
+    // Create a paragraph with high-contrast text on the solid background
+    let switcher_paragraph = Paragraph::new(text).wrap(Wrap { trim: true }).style(
+        Style::default()
+            .bg(Color::Rgb(20, 20, 35)) // Match background color for consistency
+            .fg(Color::White),
+    ); // High-contrast white text
+    f.render_widget(switcher_paragraph, inner_area);
 }
 
 fn render_input_box(
     f: &mut Frame,
     area: Rect,
     input: &Input,
-    tool_calls: &[crate::types::ToolCall],
+    tool_calls: &[ToolCall],
     is_awaiting_confirmation: bool,
 ) {
     let title = if is_awaiting_confirmation {
@@ -540,14 +806,9 @@ fn render_input_box(
     if is_awaiting_confirmation {
         let mut text = String::new();
         for call in tool_calls {
+            text.push_str(&format!("Tool: {}\n", call.function.name));
             text.push_str(&format!(
-                "Tool: {}
-",
-                call.function.name
-            ));
-            text.push_str(&format!(
-                "Arguments: {}
-\n",
+                "Arguments: {}\n\n",
                 serde_json::to_string_pretty(&call.function.arguments)
                     .unwrap_or_else(|_| "Invalid JSON".to_string())
             ));
@@ -562,3 +823,4 @@ fn render_input_box(
         f.set_cursor_position(Position::new(cursor_x, cursor_y));
     }
 }
+
