@@ -193,6 +193,16 @@ impl Orchestrator {
                         }
                     }
                 }
+                AppEvent::RefreshSessions => {
+                    match Orchestrator::list_sessions() {
+                        Ok(sessions) => {
+                            self.tx.send(AppEvent::SessionList(sessions)).await?;
+                        }
+                        Err(e) => {
+                            self.tx.send(AppEvent::Error(e.to_string())).await?;
+                        }
+                    }
+                }
                 _ => {}
             }
         }

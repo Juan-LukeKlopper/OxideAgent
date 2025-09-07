@@ -261,15 +261,11 @@ impl Tui {
                     false,
                 ));
                 // Refresh session list to include the new session
-                match crate::orchestrator::Orchestrator::list_sessions() {
-                    Ok(sessions) => self.available_sessions = sessions,
-                    Err(_) => {
-                        // If listing fails, at least ensure current session is in the list
-                        if !self.available_sessions.contains(&self.session_name) {
-                            self.available_sessions.push(self.session_name.clone());
-                        }
-                    }
-                }
+                let _ = self.tx.try_send(AppEvent::RefreshSessions);
+            }
+            AppEvent::SessionList(sessions) => {
+                // Update available sessions without displaying a message
+                self.available_sessions = sessions;
             }
             AppEvent::SessionHistory(history) => {
                 // Convert and add the session history to the messages
@@ -288,10 +284,11 @@ impl Tui {
                     false,
                 ));
             }
+            AppEvent::RefreshSessions => {
+                // This event is sent to the orchestrator, not handled here
+            }
             AppEvent::ListSessions => {
                 // This event is sent to the orchestrator, not handled here
-                // When the orchestrator responds with session list, it will be in AgentMessage
-                // TODO: Handle list sessions response to update available_sessions
             }
         }
         Ok(())
@@ -382,8 +379,8 @@ impl Tui {
                 // Reset selection when opening
                 if self.show_switcher_overlay {
                     self.switcher_selection = SwitcherSelection::Agent(0);
-                    // Request updated session list
-                    self.tx.send(AppEvent::ListSessions).await?;
+                    // Request updated session list without displaying response
+                    self.tx.send(AppEvent::RefreshSessions).await?;
                 }
             }
             KeyCode::Enter => {
