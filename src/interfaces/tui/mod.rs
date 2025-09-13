@@ -1,5 +1,7 @@
-use crate::agents::AgentId;
+use crate::core::agents::AgentId;
+use crate::core::interface::{InputHandler, Interface, OutputHandler, EventEmitter};
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
+use async_trait::async_trait;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, MouseEvent,
@@ -69,7 +71,7 @@ impl Tui {
         let messages = Self::convert_history_to_messages(session_history);
 
         // Get available sessions from orchestrator
-        let available_sessions = match crate::orchestrator::Orchestrator::list_sessions() {
+        let available_sessions = match crate::core::orchestrator::Orchestrator::list_sessions() {
             Ok(sessions) => sessions,
             Err(_) => vec!["default".to_string()], // Fallback to default if listing fails
         };
@@ -552,6 +554,98 @@ Tool approval options (when prompted):
         )?;
         self.terminal.show_cursor()?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl InputHandler for Tui {
+    async fn handle_input(&mut self, input: String) -> anyhow::Result<()> {
+        // Send the input to the orchestrator
+        self.tx.send(AppEvent::UserInput(input)).await?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl OutputHandler for Tui {
+    async fn send_output(&mut self, output: AppEvent) -> anyhow::Result<()> {
+        // Handle the output event
+        self.handle_app_event(output)
+    }
+}
+
+impl EventEmitter for Tui {
+    fn get_event_sender(&self) -> mpsc::Sender<AppEvent> {
+        self.tx.clone()
+    }
+    
+    fn get_event_receiver(&mut self) -> mpsc::Receiver<AppEvent> {
+        // This is a bit tricky since we already have a receiver
+        // In a real implementation, we might want to restructure this
+        // For now, we'll just return a dummy channel
+        let (_tx, rx) = mpsc::channel(1);
+        // We're not using this in the current implementation, so it's fine
+        rx
+    }
+}
+
+#[async_trait]
+impl Interface for Tui {
+    async fn init(&mut self) -> anyhow::Result<()> {
+        // The TUI is already initialized in the new() function
+        Ok(())
+    }
+    
+    async fn run(&mut self) -> anyhow::Result<()> {
+        // Run the TUI event loop
+        self.run().await
+    }
+    
+    async fn cleanup(&mut self) -> anyhow::Result<()> {
+        // Restore the terminal
+        self.restore()
+    }
+    
+    fn get_session_history(&self) -> Vec<ChatMessage> {
+        // Convert TUI messages back to ChatMessage format
+        let mut history = Vec::new();
+        for message in &self.messages {
+            match message {
+                Message::User(content) => {
+                    history.push(ChatMessage {
+                        role: "user".to_string(),
+                        content: content.clone(),
+                        tool_calls: None,
+                    });
+                }
+                Message::Agent(_, content) => {
+                    history.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: content.clone(),
+                        tool_calls: None,
+                    });
+                }
+                Message::Thinking(_, content, _) => {
+                    history.push(ChatMessage {
+                        role: "assistant".to_string(),
+                        content: content.clone(),
+                        tool_calls: None,
+                    });
+                }
+                Message::ToolOutput(_content, _) => {
+                    // Tool outputs are typically not part of the session history
+                    // But we might want to include some of them
+                }
+                Message::ToolConfirmation(_) => {
+                    // Tool confirmations are not part of the session history
+                }
+            }
+        }
+        history
+    }
+    
+    fn get_session_name(&self) -> String {
+        self.session_name.clone()
     }
 }
 

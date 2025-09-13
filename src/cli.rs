@@ -20,6 +20,9 @@ pub struct Args {
 
     #[arg(long, help = "Authentication token for the MCP server")]
     pub mcp_auth_token: Option<String>,
+
+    #[arg(long, value_enum, default_value = "tui", help = "Interface type to use")]
+    pub interface: InterfaceType,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -27,6 +30,12 @@ pub enum AgentType {
     Qwen,
     Llama,
     Granite,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+pub enum InterfaceType {
+    Tui,
+    // In the future we could add Web, Telegram, etc.
 }
 
 impl AgentType {

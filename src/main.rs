@@ -1,19 +1,17 @@
-mod agents;
 mod cli;
-mod ollama;
-mod orchestrator;
-mod tools;
-mod tui;
+mod core;
+mod interfaces;
 mod types;
 
-use agents::Agent;
+use crate::core::agents::Agent;
+use crate::core::interface::Interface;
+use crate::core::orchestrator::Orchestrator;
+use crate::core::tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
+use crate::interfaces::tui::Tui;
+use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
 use cli::Args;
-use orchestrator::Orchestrator;
 use tokio::sync::mpsc;
-use tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
-use tui::Tui;
-use types::AppEvent;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -52,8 +50,8 @@ async fn main() -> anyhow::Result<()> {
     tool_registry.add_tool(Box::new(RunShellCommandTool));
 
     // Create channels for communication
-    let (orchestrator_tx, tui_rx) = mpsc::channel::<AppEvent>(32);
-    let (tui_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
+    let (orchestrator_tx, interface_rx) = mpsc::channel::<AppEvent>(32);
+    let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create the orchestrator
     let mut orchestrator = Orchestrator::new(
@@ -68,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     // Load the previous session state if it exists
     orchestrator.load_state()?;
 
-    // Get the session history to pass to the TUI
+    // Get the session history to pass to the interface
     let session_history = orchestrator.get_session_history().clone();
 
     // Run the orchestrator in a separate task
@@ -78,10 +76,32 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // Initialize and run the TUI with the session name and history
-    let mut tui = Tui::new(tui_rx, tui_tx, session_name, session_history)?;
-    tui.run().await?;
-    tui.restore()?;
+    // Create the interface (TUI in this case)
+    let mut interface = create_interface(args.interface, interface_rx, interface_tx, session_name, session_history)?;
+    
+    // Initialize the interface
+    interface.init().await?;
+    
+    // Run the interface
+    interface.run().await?;
+    
+    // Cleanup the interface
+    interface.cleanup().await?;
 
     Ok(())
+}
+
+fn create_interface(
+    interface_type: cli::InterfaceType,
+    rx: mpsc::Receiver<AppEvent>,
+    tx: mpsc::Sender<AppEvent>,
+    session_name: String,
+    session_history: Vec<ChatMessage>,
+) -> anyhow::Result<Box<dyn Interface>> {
+    match interface_type {
+        cli::InterfaceType::Tui => {
+            let tui = Tui::new(rx, tx, session_name, session_history)?;
+            Ok(Box::new(tui))
+        }
+    }
 }

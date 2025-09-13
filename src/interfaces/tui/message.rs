@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{agents::AgentId, types::ToolCall};
+use crate::{core::agents::AgentId, types::ToolCall};
 
 #[derive(Debug, Clone)]
 pub enum Message {
