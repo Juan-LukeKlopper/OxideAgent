@@ -1,25 +1,24 @@
 mod cli;
+mod config;
 mod core;
 mod interfaces;
 mod types;
 
-use crate::core::agents::Agent;
 use crate::core::interface::Interface;
-use crate::core::orchestrator::Orchestrator;
-use crate::core::tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
 use crate::interfaces::tui::Tui;
 use crate::types::{AppEvent, ChatMessage};
-use clap::Parser;
-use cli::Args;
 use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let config = config::Config::from_args();
+    
+    // Validate the configuration
+    config.validate()?;
 
     // Handle session listing if requested
-    if args.list_sessions {
-        match Orchestrator::list_sessions() {
+    if config.list_sessions {
+        match crate::core::session::SessionManager::list_sessions() {
             Ok(sessions) => {
                 if sessions.is_empty() {
                     println!("No sessions found.");
@@ -37,31 +36,18 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // Create the container
+    let mut container = crate::core::container::Container::new(config);
+
     // Determine the session name for display
-    let session_name = args.session.clone().unwrap_or_else(|| "default".to_string());
-
-    // Create the agent
-    let agent = Agent::new(args.agent.name(), args.agent.model());
-
-    // Create and populate the tool registry
-    let mut tool_registry = ToolRegistry::new();
-    tool_registry.add_tool(Box::new(WriteFileTool));
-    tool_registry.add_tool(Box::new(ReadFileTool));
-    tool_registry.add_tool(Box::new(RunShellCommandTool));
+    let session_name = container.config().session.clone().unwrap_or_else(|| "default".to_string());
 
     // Create channels for communication
     let (orchestrator_tx, interface_rx) = mpsc::channel::<AppEvent>(32);
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
-    // Create the orchestrator
-    let mut orchestrator = Orchestrator::new(
-        agent,
-        tool_registry,
-        args.session,
-        args.no_stream,
-        orchestrator_tx,
-        orchestrator_rx,
-    );
+    // Build the orchestrator using the container
+    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx)?;
 
     // Load the previous session state if it exists
     orchestrator.load_state()?;
@@ -77,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create the interface (TUI in this case)
-    let mut interface = create_interface(args.interface, interface_rx, interface_tx, session_name, session_history)?;
+    let mut interface = create_interface(&container.config().interface, interface_rx, interface_tx, session_name, session_history)?;
     
     // Initialize the interface
     interface.init().await?;
@@ -92,14 +78,14 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn create_interface(
-    interface_type: cli::InterfaceType,
+    interface_type: &config::InterfaceType,
     rx: mpsc::Receiver<AppEvent>,
     tx: mpsc::Sender<AppEvent>,
     session_name: String,
     session_history: Vec<ChatMessage>,
 ) -> anyhow::Result<Box<dyn Interface>> {
     match interface_type {
-        cli::InterfaceType::Tui => {
+        config::InterfaceType::Tui => {
             let tui = Tui::new(rx, tx, session_name, session_history)?;
             Ok(Box::new(tui))
         }
