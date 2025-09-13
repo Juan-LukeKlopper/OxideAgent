@@ -20,6 +20,7 @@ impl std::fmt::Display for AgentId {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Agent {
     pub model: String,
     pub history: Vec<ChatMessage>,
