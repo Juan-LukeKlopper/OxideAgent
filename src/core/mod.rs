@@ -4,6 +4,7 @@
 //! interface implementations to enable multiple interface types (TUI, Web, Telegram, etc.)
 
 pub mod agents;
+pub mod container;
 pub mod events;
 pub mod interface;
 pub mod llm;
