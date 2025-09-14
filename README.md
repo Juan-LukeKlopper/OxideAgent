@@ -1,6 +1,6 @@
-# OxideAgent ✅
+# OxideAgent 
 
-[![CI](https://github.com/your-username/OxideAgent/workflows/CI/badge.svg)](https://github.com/your-username/OxideAgent/actions)
+[![CI](https://github.com/Juan-LukeKlopper/OxideAgent/workflows/CI/badge.svg)](https://github.com/Juan-LukeKlopper/OxideAgent/actions)
 
 A local-first, feature-rich AI agent written in Rust that runs on your machine and connects to Ollama.
 
@@ -45,7 +45,7 @@ This project has undergone a comprehensive refactoring to improve its architectu
 
 1. Clone the repo
    ```sh
-   git clone https://github.com/your_username/OxideAgent.git
+   git clone https://github.com/Juan-LukeKlopper/OxideAgent.git
    ```
 
 2. Install the required Ollama models
