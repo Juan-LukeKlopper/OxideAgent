@@ -1,5 +1,5 @@
 use crate::core::agents::AgentId;
-use crate::core::interface::{InputHandler, Interface, OutputHandler, EventEmitter};
+use crate::core::interface::{EventEmitter, InputHandler, Interface, OutputHandler};
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use async_trait::async_trait;
 use crossterm::{
@@ -88,7 +88,11 @@ impl Tui {
             show_status_overlay: false,
             show_switcher_overlay: false,
             current_agent: session_name.clone(),
-            available_agents: vec!["Qwen".to_string(), "Llama".to_string(), "Granite".to_string()],
+            available_agents: vec![
+                "Qwen".to_string(),
+                "Llama".to_string(),
+                "Granite".to_string(),
+            ],
             message_positions: Vec::new(),
             session_name,
             // Initialize switcher selection state
@@ -214,20 +218,22 @@ impl Tui {
             }
             AppEvent::AgentStreamEnd => {
                 // Clean up any empty agent messages that might have been created
-                if let Some(Message::Agent(_, content)) = self.messages.last() {
-                    if content.is_empty() {
-                        self.messages.pop();
-                    }
+                if let Some(Message::Agent(_, content)) = self.messages.last()
+                    && content.is_empty()
+                {
+                    self.messages.pop();
                 }
             }
             AppEvent::AgentMessage(content) => {
                 // Check if this is a session list message
                 if content.starts_with("Available sessions:") {
                     // Show session list expanded by default
-                    self.messages.push(Message::ToolOutput(content.clone(), true));
+                    self.messages
+                        .push(Message::ToolOutput(content.clone(), true));
                     // Parse session list and update available_sessions
                     if let Some(sessions_str) = content.strip_prefix("Available sessions: ") {
-                        let sessions: Vec<String> = sessions_str.split(", ").map(|s| s.to_string()).collect();
+                        let sessions: Vec<String> =
+                            sessions_str.split(", ").map(|s| s.to_string()).collect();
                         self.available_sessions = sessions;
                     }
                 } else {
@@ -389,8 +395,8 @@ impl Tui {
                 let user_input = self.input.value().to_string();
                 if !user_input.is_empty() {
                     // Check if this is a session switch command
-                    if user_input.starts_with("/switch ") {
-                        let session_name = user_input[8..].trim().to_string();
+                    if let Some(stripped) = user_input.strip_prefix("/switch ") {
+                        let session_name = stripped.trim().to_string();
                         self.tx.send(AppEvent::SwitchSession(session_name)).await?;
                         self.messages.push(Message::User(user_input.clone()));
                     } else {
@@ -462,7 +468,8 @@ impl Tui {
                         self.tx
                             .send(AppEvent::SwitchAgent(selected_agent.clone()))
                             .await?;
-                        self.messages.push(Message::User(format!("/switch agent {}", selected_agent)));
+                        self.messages
+                            .push(Message::User(format!("/switch agent {}", selected_agent)));
                         // Update the current agent locally
                         self.current_agent = selected_agent.clone();
                     }
@@ -486,12 +493,6 @@ impl Tui {
         Ok(())
     }
 
-    async fn show_sessions(&mut self) -> anyhow::Result<()> {
-        // Send event to orchestrator to list sessions
-        self.tx.send(AppEvent::ListSessions).await?;
-        Ok(())
-    }
-
     fn show_help(&mut self) {
         let help_text = r#"Available commands:
 - Ctrl+q: Quit the application
@@ -511,12 +512,9 @@ Tool approval options (when prompted):
     }
 
     fn handle_mouse_event(&mut self, mouse: MouseEvent) {
-        match mouse.kind {
-            MouseEventKind::Down(_) => {
-                // Handle mouse click to expand/collapse messages
-                self.toggle_message_expansion(mouse.column, mouse.row);
-            }
-            _ => {}
+        if let MouseEventKind::Down(_) = mouse.kind {
+            // Handle mouse click to expand/collapse messages
+            self.toggle_message_expansion(mouse.column, mouse.row);
         }
     }
 
@@ -578,7 +576,7 @@ impl EventEmitter for Tui {
     fn get_event_sender(&self) -> mpsc::Sender<AppEvent> {
         self.tx.clone()
     }
-    
+
     fn get_event_receiver(&mut self) -> mpsc::Receiver<AppEvent> {
         // This is a bit tricky since we already have a receiver
         // In a real implementation, we might want to restructure this
@@ -595,17 +593,17 @@ impl Interface for Tui {
         // The TUI is already initialized in the new() function
         Ok(())
     }
-    
+
     async fn run(&mut self) -> anyhow::Result<()> {
         // Run the TUI event loop
         self.run().await
     }
-    
+
     async fn cleanup(&mut self) -> anyhow::Result<()> {
         // Restore the terminal
         self.restore()
     }
-    
+
     fn get_session_history(&self) -> Vec<ChatMessage> {
         // Convert TUI messages back to ChatMessage format
         let mut history = Vec::new();
@@ -643,7 +641,7 @@ impl Interface for Tui {
         }
         history
     }
-    
+
     fn get_session_name(&self) -> String {
         self.session_name.clone()
     }
@@ -738,6 +736,7 @@ fn render_chat_history(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ui(
     f: &mut Frame,
     messages: &[Message],
@@ -829,13 +828,11 @@ fn render_switcher_panel(
                 // Highlight current agent
                 text.push_str(&format!("     {} (current)\n", agent));
             }
+        } else if is_selected {
+            // Highlight selected agent with bright color
+            text.push_str(&format!("  -> [{}]\n", agent));
         } else {
-            if is_selected {
-                // Highlight selected agent with bright color
-                text.push_str(&format!("  -> [{}]\n", agent));
-            } else {
-                text.push_str(&format!("     {}\n", agent));
-            }
+            text.push_str(&format!("     {}\n", agent));
         }
     }
 
@@ -856,13 +853,11 @@ fn render_switcher_panel(
                 // Highlight current session
                 text.push_str(&format!("     {} (current)\n", session));
             }
+        } else if is_selected {
+            // Highlight selected session with bright color\n
+            text.push_str(&format!("  -> [{}]\\n", session));
         } else {
-            if is_selected {
-                // Highlight selected session with bright color
-                text.push_str(&format!("  -> [{}]\n", session));
-            } else {
-                text.push_str(&format!("     {}\n", session));
-            }
+            text.push_str(&format!("     {}\\n", session));
         }
     }
 
@@ -914,4 +909,3 @@ fn render_input_box(
         f.set_cursor_position(Position::new(cursor_x, cursor_y));
     }
 }
-

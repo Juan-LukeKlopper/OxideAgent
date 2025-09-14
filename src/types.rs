@@ -19,9 +19,9 @@ pub enum AppEvent {
     ToolRequest(Vec<ToolCall>),
     ToolResult(String, String),
     Error(String),
-    SwitchSession(String), // New event for switching sessions
-    SwitchAgent(String), // New event for switching agents
-    ListSessions, // New event for listing sessions
+    SwitchSession(String),            // New event for switching sessions
+    SwitchAgent(String),              // New event for switching agents
+    ListSessions,                     // New event for listing sessions
     RefreshSessions, // New event for refreshing sessions without displaying response
     SessionList(Vec<String>), // New event to send session list to TUI
     SessionSwitched(String), // New event to notify TUI that session has been switched

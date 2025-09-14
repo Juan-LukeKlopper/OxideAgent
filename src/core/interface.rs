@@ -24,7 +24,7 @@ pub trait OutputHandler {
 pub trait EventEmitter {
     /// Get the sender for sending events to the interface
     fn get_event_sender(&self) -> mpsc::Sender<AppEvent>;
-    
+
     /// Get the receiver for receiving events from the interface
     fn get_event_receiver(&mut self) -> mpsc::Receiver<AppEvent>;
 }
@@ -34,16 +34,16 @@ pub trait EventEmitter {
 pub trait Interface: InputHandler + OutputHandler + EventEmitter + Send {
     /// Initialize the interface
     async fn init(&mut self) -> Result<()>;
-    
+
     /// Run the interface event loop
     async fn run(&mut self) -> Result<()>;
-    
+
     /// Cleanup the interface
     async fn cleanup(&mut self) -> Result<()>;
-    
+
     /// Get the session history for this interface
     fn get_session_history(&self) -> Vec<ChatMessage>;
-    
+
     /// Get the session name for this interface
     fn get_session_name(&self) -> String;
 }

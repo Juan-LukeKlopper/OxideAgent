@@ -63,16 +63,16 @@ impl Orchestrator {
     pub fn switch_session(&mut self, session_name: Option<String>) -> anyhow::Result<()> {
         // Save current state first
         self.save_state()?;
-        
+
         // Update session file name
         self.session_file = SessionManager::get_session_filename(session_name.as_deref());
-        
+
         // Reset agent history
         self.agent.history.clear();
-        
+
         // Load new session
         self.load_state()?;
-        
+
         Ok(())
     }
 
@@ -95,18 +95,22 @@ impl Orchestrator {
                     } else {
                         Some(session_name)
                     };
-                    
+
                     // Clone the session_opt for the display name before moving it
                     let display_name = session_opt.clone().unwrap_or_else(|| "default".to_string());
-                    
+
                     if let Err(e) = self.switch_session(session_opt) {
                         self.tx.send(AppEvent::Error(e.to_string())).await?;
                     } else {
                         // Notify TUI that session has been switched
-                        self.tx.send(AppEvent::SessionSwitched(display_name)).await?;
-                        
+                        self.tx
+                            .send(AppEvent::SessionSwitched(display_name))
+                            .await?;
+
                         // Send the session history to the TUI
-                        self.tx.send(AppEvent::SessionHistory(self.get_session_history().clone())).await?;
+                        self.tx
+                            .send(AppEvent::SessionHistory(self.get_session_history().clone()))
+                            .await?;
                     }
                 }
                 AppEvent::SwitchAgent(agent_name) => {
@@ -116,41 +120,50 @@ impl Orchestrator {
                         "Llama" => crate::cli::AgentType::Llama,
                         "Granite" => crate::cli::AgentType::Granite,
                         _ => {
-                            self.tx.send(AppEvent::Error(format!("Unknown agent: {}", agent_name))).await?;
+                            self.tx
+                                .send(AppEvent::Error(format!("Unknown agent: {}", agent_name)))
+                                .await?;
                             continue;
                         }
                     };
-                    
+
                     // Create new agent
-                    let new_agent = crate::core::agents::Agent::new(agent_type.name(), agent_type.model());
-                    
+                    let new_agent =
+                        crate::core::agents::Agent::new(agent_type.name(), agent_type.model());
+
                     // Replace the current agent
                     self.agent = new_agent;
-                    
+
                     // Notify TUI that agent has been switched
-                    self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
+                    self.tx
+                        .send(AppEvent::AgentMessage(format!(
+                            "Switched to agent: {}",
+                            agent_name
+                        )))
+                        .await?;
                 }
-                AppEvent::ListSessions => {
-                    match Orchestrator::list_sessions() {
-                        Ok(sessions) => {
-                            let session_list = sessions.join(", ");
-                            self.tx.send(AppEvent::AgentMessage(format!("Available sessions: {}", session_list))).await?;
-                        }
-                        Err(e) => {
-                            self.tx.send(AppEvent::Error(e.to_string())).await?;
-                        }
+                AppEvent::ListSessions => match Orchestrator::list_sessions() {
+                    Ok(sessions) => {
+                        let session_list = sessions.join(", ");
+                        self.tx
+                            .send(AppEvent::AgentMessage(format!(
+                                "Available sessions: {}",
+                                session_list
+                            )))
+                            .await?;
                     }
-                }
-                AppEvent::RefreshSessions => {
-                    match Orchestrator::list_sessions() {
-                        Ok(sessions) => {
-                            self.tx.send(AppEvent::SessionList(sessions)).await?;
-                        }
-                        Err(e) => {
-                            self.tx.send(AppEvent::Error(e.to_string())).await?;
-                        }
+                    Err(e) => {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
-                }
+                },
+                AppEvent::RefreshSessions => match Orchestrator::list_sessions() {
+                    Ok(sessions) => {
+                        self.tx.send(AppEvent::SessionList(sessions)).await?;
+                    }
+                    Err(e) => {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    }
+                },
                 _ => {}
             }
         }
@@ -177,8 +190,7 @@ impl Orchestrator {
                             .await?;
                         self.agent.add_user_message(&format!(
                             "The tool '{}' produced this output:\n{}",
-                            tool_call.function.name,
-                            tool_output
+                            tool_call.function.name, tool_output
                         ));
                     }
                     self.save_state()?;
@@ -189,12 +201,10 @@ impl Orchestrator {
                     self.agent
                         .add_user_message("Tool execution denied by user.");
                     self.tx
-                        .send(AppEvent::AgentMessage(
-                            "Tool execution denied.".to_string(),
-                        ))
+                        .send(AppEvent::AgentMessage("Tool execution denied.".to_string()))
                         .await?;
                     self.save_state()?;
-                    return Ok(())
+                    return Ok(());
                 }
                 // TODO: Implement AlwaysAllow and AlwaysAllowSession
                 _ => {
@@ -203,7 +213,7 @@ impl Orchestrator {
                             "This approval mode is not implemented yet.".to_string(),
                         ))
                         .await?;
-                    return Ok(())
+                    return Ok(());
                 }
             }
         }
@@ -211,46 +221,44 @@ impl Orchestrator {
     }
 
     async fn chat_with_agent(&mut self) -> anyhow::Result<()> {
-        'agent_turn: loop {
-            let tool_definitions = self.tool_registry.definitions();
-            let response = self
-                .agent
-                .chat(
-                    &self.client,
-                    &tool_definitions,
-                    !self.no_stream,
-                    self.tx.clone(),
-                )
-                .await?;
+        // Removed the loop since it only iterates once
+        let tool_definitions = self.tool_registry.definitions();
+        let response = self
+            .agent
+            .chat(
+                &self.client,
+                &tool_definitions,
+                !self.no_stream,
+                self.tx.clone(),
+            )
+            .await?;
 
-            if let Some(response) = response {
-                if let Some(tool_calls) = &response.tool_calls {
-                    self.tx
-                        .send(AppEvent::ToolRequest(tool_calls.clone()))
-                        .await?;
-                    self.pending_tool_calls = Some(tool_calls.clone());
-                } else if self.no_stream {
-                    // For non-streaming responses, we need to send AgentMessage to display the content
-                    self.tx
-                        .send(AppEvent::AgentMessage(response.content.clone()))
-                        .await?;
-                }
-                // For streaming responses, the content is already displayed via AgentStreamChunk events
-                // The streaming case is handled by the UI, which accumulates chunks into a message
+        if let Some(response) = response {
+            if let Some(tool_calls) = &response.tool_calls {
+                self.tx
+                    .send(AppEvent::ToolRequest(tool_calls.clone()))
+                    .await?;
+                self.pending_tool_calls = Some(tool_calls.clone());
+            } else if self.no_stream {
+                // For non-streaming responses, we need to send AgentMessage to display the content
+                self.tx
+                    .send(AppEvent::AgentMessage(response.content.clone()))
+                    .await?;
             }
-            self.save_state()?;
-            break 'agent_turn;
+            // For streaming responses, the content is already displayed via AgentStreamChunk events
+            // The streaming case is handled by the UI, which accumulates chunks into a message
         }
+        self.save_state()?;
         Ok(())
     }
 
     async fn execute_tool(&self, tool_call: &ToolCall) -> anyhow::Result<String> {
         if let Some(tool) = self.tool_registry.get_tool(&tool_call.function.name) {
-            return tool.execute(&tool_call.function.arguments);
+            tool.execute(&tool_call.function.arguments)
         } else {
             let error_msg = format!("Unknown tool: {}", tool_call.function.name);
             self.tx.send(AppEvent::Error(error_msg.clone())).await?;
-            return Err(anyhow::anyhow!(error_msg));
+            Err(anyhow::anyhow!(error_msg))
         }
     }
 

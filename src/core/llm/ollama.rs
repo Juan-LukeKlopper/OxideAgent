@@ -7,12 +7,8 @@ use tokio::sync::mpsc;
 pub async fn send_chat(
     client: &Client,
     model: &str,
-    history: &[
-        ChatMessage
-    ],
-    tools: &[
-        Tool
-    ],
+    history: &[ChatMessage],
+    tools: &[Tool],
     stream: bool,
     tx: mpsc::Sender<AppEvent>,
 ) -> anyhow::Result<Option<ChatMessage>> {
@@ -48,8 +44,7 @@ pub async fn send_chat(
                     Err(e) => {
                         tx.send(AppEvent::Error(format!(
                             "Error parsing JSON line: '{}', error: {}",
-                            line,
-                            e
+                            line, e
                         )))
                         .await?;
                         continue;
@@ -57,8 +52,7 @@ pub async fn send_chat(
                 };
 
                 if let Some(c) = parsed["message"]["content"].as_str() {
-                    tx.send(AppEvent::AgentStreamChunk(c.to_string()))
-                        .await?;
+                    tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
                     content.push_str(c);
                 }
 

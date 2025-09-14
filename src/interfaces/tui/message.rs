@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     widgets::{Block, BorderType, Borders, Paragraph, Wrap},
-    Frame,
 };
 
 use crate::{core::agents::AgentId, types::ToolCall};
@@ -13,25 +13,27 @@ pub enum Message {
     User(String),
     Agent(AgentId, String),
     Thinking(AgentId, String, bool), // AgentId, content, is_expanded
-    ToolOutput(String, bool), // content, is_expanded
+    ToolOutput(String, bool),        // content, is_expanded
     ToolConfirmation(Vec<ToolCall>),
 }
 
-impl ToString for Message {
-    fn to_string(&self) -> String {
+use std::fmt;
+
+impl fmt::Display for Message {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Message::User(s) => s.clone(),
-            Message::Agent(_, s) => s.clone(),
-            Message::Thinking(_, s, _) => s.clone(),
-            Message::ToolOutput(s, _) => s.clone(),
+            Message::User(s) => write!(f, "{}", s),
+            Message::Agent(_, s) => write!(f, "{}", s),
+            Message::Thinking(_, s, _) => write!(f, "{}", s),
+            Message::ToolOutput(s, _) => write!(f, "{}", s),
             Message::ToolConfirmation(calls) => {
-                let mut confirmation_text = String::from("Agent wants to use the following tools:\n");
+                let _confirmation_text = String::from("Agent wants to use the following tools:\n");
                 for call in calls {
-                    let args = serde_json::to_string_pretty(&call.function.arguments).unwrap_or_else(|_| "Invalid JSON".to_string());
-                    confirmation_text.push_str(&format!("- {}: \n{}", call.function.name, args));
+                    let args = serde_json::to_string_pretty(&call.function.arguments)
+                        .unwrap_or_else(|_| "Invalid JSON".to_string());
+                    write!(f, "- {}: \n{}", call.function.name, args)?;
                 }
-                confirmation_text.push_str("Do you approve?");
-                confirmation_text
+                write!(f, "Do you approve?")
             }
         }
     }
@@ -74,7 +76,7 @@ impl Message {
                 } else {
                     "Agent (Thinking...) [Click to expand]"
                 };
-                
+
                 // Process content to handle the #### markers
                 let processed_content = if *is_expanded {
                     // When expanded, show the full content but highlight the markers
@@ -88,7 +90,7 @@ impl Message {
                         content.lines().next().unwrap_or("Thinking...").to_string()
                     }
                 };
-                
+
                 Paragraph::new(processed_content)
                     .block(
                         Block::default()
@@ -110,7 +112,7 @@ impl Message {
                 } else {
                     "Tool Output [Click to expand]"
                 };
-                
+
                 // Process content to handle collapsed state
                 let processed_content = if *is_expanded {
                     content.clone()
@@ -123,7 +125,7 @@ impl Message {
                         content.clone()
                     }
                 };
-                
+
                 Paragraph::new(processed_content)
                     .block(
                         Block::default()
@@ -138,7 +140,7 @@ impl Message {
                             )),
                     )
                     .wrap(Wrap { trim: true })
-            },
+            }
             Message::ToolConfirmation(calls) => {
                 let mut text = String::new();
                 for call in calls {
