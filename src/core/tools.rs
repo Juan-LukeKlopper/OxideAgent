@@ -1,5 +1,5 @@
-use crate::types::{Tool as ApiTool};
-use serde_json::{json, Value};
+use crate::types::Tool as ApiTool;
+use serde_json::{Value, json};
 use std::fs;
 use std::process::Command;
 
@@ -39,8 +39,11 @@ impl ToolRegistry {
         self.tools.push(tool);
     }
 
-    pub fn get_tool(&self, name: &str) -> Option<&Box<dyn Tool>> {
-        self.tools.iter().find(|t| t.name() == name)
+    pub fn get_tool(&self, name: &str) -> Option<&dyn Tool> {
+        self.tools
+            .iter()
+            .find(|t| t.name() == name)
+            .map(|t| t.as_ref())
     }
 
     pub fn definitions(&self) -> Vec<ApiTool> {
@@ -54,14 +57,19 @@ impl ToolRegistry {
             .map(|t| t.definition())
             .collect()
     }
-    
+
     // Clone method that creates a new registry with the same tool definitions
     pub fn clone_registry(&self) -> Self {
         // Since tools are stateless, we can recreate the registry with the same tools
-        let new_registry = ToolRegistry::new();
         // In a real implementation, we'd need to register the tools again
         // For now, we'll return an empty registry and let the caller register the tools
-        new_registry
+        ToolRegistry::new()
+    }
+}
+
+impl Default for ToolRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

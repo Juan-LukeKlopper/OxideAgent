@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 mod cli;
 mod config;
 mod core;
@@ -12,7 +14,7 @@ use tokio::sync::mpsc;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = config::Config::from_args();
-    
+
     // Validate the configuration
     config.validate()?;
 
@@ -40,7 +42,11 @@ async fn main() -> anyhow::Result<()> {
     let mut container = crate::core::container::Container::new(config);
 
     // Determine the session name for display
-    let session_name = container.config().session.clone().unwrap_or_else(|| "default".to_string());
+    let session_name = container
+        .config()
+        .session
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
 
     // Create channels for communication
     let (orchestrator_tx, interface_rx) = mpsc::channel::<AppEvent>(32);
@@ -63,14 +69,20 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create the interface (TUI in this case)
-    let mut interface = create_interface(&container.config().interface, interface_rx, interface_tx, session_name, session_history)?;
-    
+    let mut interface = create_interface(
+        &container.config().interface,
+        interface_rx,
+        interface_tx,
+        session_name,
+        session_history,
+    )?;
+
     // Initialize the interface
     interface.init().await?;
-    
+
     // Run the interface
     interface.run().await?;
-    
+
     // Cleanup the interface
     interface.cleanup().await?;
 

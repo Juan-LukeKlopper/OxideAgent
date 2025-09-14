@@ -93,7 +93,7 @@ impl Container {
 
         // Create new instance for the orchestrator with the same configuration
         let agent_instance = Agent::new(&agent_name, &agent_model);
-        
+
         // Create a new tool registry with the same tools
         let mut new_tool_registry = ToolRegistry::new();
         // Register the same tools
@@ -101,7 +101,7 @@ impl Container {
         new_tool_registry.add_tool(Box::new(WriteFileTool));
         new_tool_registry.add_tool(Box::new(ReadFileTool));
         new_tool_registry.add_tool(Box::new(RunShellCommandTool));
-        
+
         Ok(Orchestrator::new(
             agent_instance,
             new_tool_registry,

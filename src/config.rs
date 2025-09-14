@@ -11,22 +11,22 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
     /// The agent type to use
     pub agent: AgentConfig,
-    
+
     /// Whether to disable streaming
     pub no_stream: bool,
-    
+
     /// Session name (if any)
     pub session: Option<String>,
-    
+
     /// Whether to list sessions
     pub list_sessions: bool,
-    
+
     /// MCP server URL (if any)
     pub mcp_server: Option<String>,
-    
+
     /// MCP authentication token (if any)
     pub mcp_auth_token: Option<String>,
-    
+
     /// Interface type to use
     pub interface: InterfaceType,
 }
@@ -36,19 +36,19 @@ pub struct Config {
 pub struct AgentConfig {
     /// The agent type
     pub agent_type: AgentType,
-    
+
     /// The model name
     pub model: String,
-    
+
     /// The agent name
     pub name: String,
-    
+
     /// The system prompt
     pub system_prompt: String,
 }
 
 /// Agent types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum AgentType {
     Qwen,
     Llama,
@@ -56,7 +56,7 @@ pub enum AgentType {
 }
 
 /// Interface types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum InterfaceType {
     Tui,
     // In the future we could add Web, Telegram, etc.
@@ -68,7 +68,7 @@ impl Config {
         let args = crate::cli::Args::parse();
         Self::from_cli_args(args)
     }
-    
+
     /// Create a new configuration from parsed CLI arguments
     pub fn from_cli_args(args: crate::cli::Args) -> Self {
         let agent_config = AgentConfig {
@@ -81,7 +81,7 @@ impl Config {
             name: args.agent.name().to_string(),
             system_prompt: args.agent.system_prompt().to_string(),
         };
-        
+
         Self {
             agent: agent_config,
             no_stream: args.no_stream,
@@ -94,26 +94,28 @@ impl Config {
             },
         }
     }
-    
+
     /// Validate the configuration
     pub fn validate(&self) -> anyhow::Result<()> {
         // Validate that if an MCP server is specified, an auth token is also provided
         if self.mcp_server.is_some() && self.mcp_auth_token.is_none() {
-            return Err(anyhow::anyhow!("MCP server specified but no auth token provided"));
+            return Err(anyhow::anyhow!(
+                "MCP server specified but no auth token provided"
+            ));
         }
-        
+
         // Validate that the session name doesn't contain invalid characters
         if let Some(session) = &self.session {
             if session.is_empty() {
                 return Err(anyhow::anyhow!("Session name cannot be empty"));
             }
-            
+
             // Check for invalid characters in session name
             if session.contains('/') || session.contains('\\') || session.contains(':') {
                 return Err(anyhow::anyhow!("Session name contains invalid characters"));
             }
         }
-        
+
         Ok(())
     }
 }

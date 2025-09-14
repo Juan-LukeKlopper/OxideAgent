@@ -12,23 +12,23 @@ use tokio::sync::broadcast;
 pub enum EventType {
     /// User input events
     UserInput(String),
-    
+
     /// Tool approval events
     ToolApprovalRequested(Vec<ToolCall>),
     ToolApprovalResponse(crate::types::ToolApprovalResponse),
-    
+
     /// Agent communication events
     AgentMessage(String),
     AgentStreamChunk(String),
     AgentStreamEnd,
-    
+
     /// Tool execution events
     ToolRequest(Vec<ToolCall>),
     ToolResult(String, String), // (tool_name, result)
-    
+
     /// Error events
     Error(String),
-    
+
     /// Session management events
     SwitchSession(String),
     SwitchAgent(String),
@@ -37,7 +37,7 @@ pub enum EventType {
     SessionList(Vec<String>),
     SessionSwitched(String),
     SessionHistory(Vec<ChatMessage>),
-    
+
     /// System events
     Shutdown,
     ConfigChanged,
@@ -48,13 +48,13 @@ pub enum EventType {
 pub struct Event {
     /// The event type
     pub event_type: EventType,
-    
+
     /// The source of the event
     pub source: String,
-    
+
     /// The destination of the event (if any)
     pub destination: Option<String>,
-    
+
     /// Timestamp of when the event was created
     pub timestamp: std::time::SystemTime,
 }
@@ -69,9 +69,13 @@ impl Event {
             timestamp: std::time::SystemTime::now(),
         }
     }
-    
+
     /// Create a new event with a destination
-    pub fn new_with_destination(event_type: EventType, source: String, destination: String) -> Self {
+    pub fn new_with_destination(
+        event_type: EventType,
+        source: String,
+        destination: String,
+    ) -> Self {
         Self {
             event_type,
             source,
@@ -85,30 +89,27 @@ impl Event {
 pub struct EventBus {
     /// Broadcast sender for events
     sender: broadcast::Sender<Arc<Event>>,
-    
-    /// Broadcast receiver for events
-    receiver: broadcast::Receiver<Arc<Event>>,
 }
 
 impl EventBus {
     /// Create a new event bus
     pub fn new() -> Self {
-        let (sender, receiver) = broadcast::channel(100);
-        Self { sender, receiver }
+        let (sender, _receiver) = broadcast::channel(100);
+        Self { sender }
     }
-    
+
     /// Subscribe to events
     pub fn subscribe(&self) -> broadcast::Receiver<Arc<Event>> {
         self.sender.subscribe()
     }
-    
+
     /// Publish an event
     pub fn publish(&self, event: Event) -> Result<()> {
         let event = Arc::new(event);
         self.sender.send(event)?;
         Ok(())
     }
-    
+
     /// Publish an event from an AppEvent
     pub fn publish_app_event(&self, app_event: AppEvent, source: String) -> Result<()> {
         let event_type = match app_event {
@@ -128,7 +129,7 @@ impl EventBus {
             AppEvent::SessionSwitched(session) => EventType::SessionSwitched(session),
             AppEvent::SessionHistory(history) => EventType::SessionHistory(history),
         };
-        
+
         let event = Event::new(event_type, source);
         self.publish(event)
     }
@@ -144,10 +145,10 @@ impl Default for EventBus {
 pub struct EventFilter {
     /// Source filter
     source_filter: Option<String>,
-    
+
     /// Destination filter
     destination_filter: Option<String>,
-    
+
     /// Event type filter
     event_type_filter: Option<EventType>,
 }
@@ -161,25 +162,25 @@ impl EventFilter {
             event_type_filter: None,
         }
     }
-    
+
     /// Set the source filter
     pub fn with_source(mut self, source: String) -> Self {
         self.source_filter = Some(source);
         self
     }
-    
+
     /// Set the destination filter
     pub fn with_destination(mut self, destination: String) -> Self {
         self.destination_filter = Some(destination);
         self
     }
-    
+
     /// Set the event type filter
     pub fn with_event_type(mut self, event_type: EventType) -> Self {
         self.event_type_filter = Some(event_type);
         self
     }
-    
+
     /// Check if an event matches the filter
     pub fn matches(&self, event: &Event) -> bool {
         if let Some(ref source) = self.source_filter {
@@ -187,7 +188,7 @@ impl EventFilter {
                 return false;
             }
         }
-        
+
         if let Some(ref destination) = self.destination_filter {
             if let Some(ref event_destination) = event.destination {
                 if event_destination != destination {
@@ -197,14 +198,20 @@ impl EventFilter {
                 return false;
             }
         }
-        
+
         if let Some(ref event_type) = self.event_type_filter {
             // This is a simplified comparison - in a real implementation,
             // we'd need to implement PartialEq for EventType
             // For now, we'll just return true to avoid complexity
             let _ = event_type;
         }
-        
+
         true
+    }
+}
+
+impl Default for EventFilter {
+    fn default() -> Self {
+        Self::new()
     }
 }
