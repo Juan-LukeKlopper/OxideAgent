@@ -7,6 +7,7 @@ authors = ["Juan-luke Klopper"]
 [dependencies]
 anyhow = "1.0.98"
 async-trait = "0.1.88"
+cargo-tarpaulin = "0.32.8"
 clap = { version = "4.5.43", features = ["derive"] }
 crossterm = "0.28.1"
 futures-util = "0.3.31"
