@@ -280,6 +280,10 @@ impl Tui {
                 let history_messages = Self::convert_history_to_messages(history);
                 self.messages.extend(history_messages);
             }
+            AppEvent::ContinueConversation => {
+                // This event is handled by the orchestrator, not the TUI
+                // The TUI doesn't need to do anything special here
+            }
             AppEvent::SwitchSession(_) => {
                 // This event is sent to the orchestrator, not handled here
             }

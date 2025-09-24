@@ -26,6 +26,7 @@ pub enum AppEvent {
     SessionList(Vec<String>), // New event to send session list to TUI
     SessionSwitched(String), // New event to notify TUI that session has been switched
     SessionHistory(Vec<ChatMessage>), // New event to send session history to TUI
+    ContinueConversation, // New event to continue conversation after tool execution
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
