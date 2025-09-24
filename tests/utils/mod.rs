@@ -1,3 +1,4 @@
 //! Test utilities module.
 
-pub mod test_utils;
+pub mod mock_objects;
+mod test_utils;
