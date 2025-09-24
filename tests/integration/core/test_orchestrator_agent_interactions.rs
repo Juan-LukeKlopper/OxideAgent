@@ -6,8 +6,8 @@ use OxideAgent::core::session::SessionState;
 use OxideAgent::core::tool_permissions::GlobalToolPermissions;
 use OxideAgent::core::tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
 use OxideAgent::types::{AppEvent, ChatMessage, ToolApprovalResponse};
-use tokio::sync::mpsc;
 use std::fs;
+use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn test_orchestrator_full_interaction_cycle() {
@@ -32,7 +32,9 @@ async fn test_orchestrator_full_interaction_cycle() {
 
     // Create and build the orchestrator
     let mut container = Container::new(config);
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx).unwrap();
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .unwrap();
 
     // Send a user message
     let user_message = "Hello, can you tell me your name?";
@@ -70,7 +72,9 @@ async fn test_orchestrator_session_switching() {
 
     // Create and build the orchestrator
     let mut container = Container::new(config);
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx).unwrap();
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .unwrap();
 
     // Verify initial session
     let history = orchestrator.get_session_history();
@@ -94,10 +98,10 @@ async fn test_orchestrator_tool_approvals() {
     // Create a temporary session to avoid conflicts with other tests
     let temp_session_name = "temp_tool_approval_test";
     let session_file = format!("session_{}.json", temp_session_name);
-    
+
     // Clean up any existing session file
     let _ = fs::remove_file(&session_file);
-    
+
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
@@ -119,7 +123,9 @@ async fn test_orchestrator_tool_approvals() {
 
     // Create and build the orchestrator
     let mut container = Container::new(config);
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx).unwrap();
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .unwrap();
 
     // Test loading the state
     let result = orchestrator.load_state();
@@ -137,7 +143,7 @@ fn test_global_tool_permissions_with_orchestrator_context() {
 
     // Create a fresh permissions instance
     let mut permissions = GlobalToolPermissions::new();
-    
+
     // Initially no tools should be allowed
     assert!(!permissions.is_allowed("write_file"));
     assert!(!permissions.is_allowed("read_file"));
@@ -182,10 +188,10 @@ fn test_session_state_isolation() {
     // Verify that the allowed tools lists are different
     let session1_tools = session1.list_allowed_tools();
     let session2_tools = session2.list_allowed_tools();
-    
+
     assert_eq!(session1_tools.len(), 1);
     assert_eq!(session2_tools.len(), 1);
-    
+
     assert!(session1_tools.contains(&"tool1".to_string()));
     assert!(session2_tools.contains(&"tool2".to_string()));
 }

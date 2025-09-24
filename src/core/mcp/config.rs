@@ -5,8 +5,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
 use std::fs;
+use std::path::Path;
 
 /// Represents the structure of an MCP configuration file
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -97,16 +97,22 @@ impl McpConfigFile {
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let path = path.as_ref();
         let content = fs::read_to_string(path)?;
-        let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("json");
-        
+        let extension = path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("json");
+
         match extension {
             "json" => Ok(serde_json::from_str(&content)?),
             "toml" => Ok(toml::from_str(&content)?),
             "yaml" | "yml" => Ok(serde_yaml::from_str(&content)?),
-            _ => Err(anyhow::anyhow!("Unsupported configuration file format: {}", extension)),
+            _ => Err(anyhow::anyhow!(
+                "Unsupported configuration file format: {}",
+                extension
+            )),
         }
     }
-    
+
     /// Save configuration to a file, automatically detecting the format based on extension
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
         let path = path.as_ref();
@@ -116,11 +122,11 @@ impl McpConfigFile {
             Some("yaml") | Some("yml") => serde_yaml::to_string(self)?,
             _ => serde_json::to_string_pretty(self)?,
         };
-        
+
         fs::write(path, content)?;
         Ok(())
     }
-    
+
     /// Create a new empty configuration file
     pub fn new() -> Self {
         Self {
@@ -128,27 +134,30 @@ impl McpConfigFile {
             servers: Vec::new(),
         }
     }
-    
+
     /// Get a server configuration by name
     pub fn get_server(&self, name: &str) -> Option<&McpServerConfig> {
         self.servers.iter().find(|server| server.name == name)
     }
-    
+
     /// Add a new server configuration
     pub fn add_server(&mut self, server: McpServerConfig) {
         self.servers.push(server);
     }
-    
+
     /// Remove a server configuration by name
     pub fn remove_server(&mut self, name: &str) -> bool {
         let initial_len = self.servers.len();
         self.servers.retain(|server| server.name != name);
         self.servers.len() < initial_len
     }
-    
+
     /// List all server names
     pub fn list_server_names(&self) -> Vec<String> {
-        self.servers.iter().map(|server| server.name.clone()).collect()
+        self.servers
+            .iter()
+            .map(|server| server.name.clone())
+            .collect()
     }
 }
 

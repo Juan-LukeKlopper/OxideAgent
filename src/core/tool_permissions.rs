@@ -3,12 +3,12 @@
 //! This module handles persistent storage and management of tool permissions,
 //! including global permissions and session-specific permissions.
 
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
-use once_cell::sync::Lazy;
 
 // Global mutex to synchronize file access for tool permissions
 static TOOL_PERMISSIONS_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
@@ -36,7 +36,7 @@ impl GlobalToolPermissions {
     pub fn load_from_path<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         // Acquire lock to prevent race conditions during file access
         let _lock = TOOL_PERMISSIONS_MUTEX.lock().unwrap();
-        
+
         let path = path.as_ref();
         if path.exists() {
             match fs::read_to_string(path) {
@@ -51,10 +51,14 @@ impl GlobalToolPermissions {
                         Ok(permissions) => {
                             eprintln!("DEBUG: Successfully parsed permissions: {:?}", permissions);
                             Ok(permissions)
-                        },
+                        }
                         Err(e) => {
                             // Log error but don't crash
-                            eprintln!("Warning: Failed to parse tool permissions file '{}': {}", path.display(), e);
+                            eprintln!(
+                                "Warning: Failed to parse tool permissions file '{}': {}",
+                                path.display(),
+                                e
+                            );
                             eprintln!("Using default tool permissions as fallback.");
                             Ok(Self::default())
                         }
@@ -62,7 +66,11 @@ impl GlobalToolPermissions {
                 }
                 Err(e) => {
                     // Log error but don't crash
-                    eprintln!("Warning: Failed to read tool permissions file '{}': {}", path.display(), e);
+                    eprintln!(
+                        "Warning: Failed to read tool permissions file '{}': {}",
+                        path.display(),
+                        e
+                    );
                     Ok(Self::default())
                 }
             }
@@ -81,7 +89,7 @@ impl GlobalToolPermissions {
     pub fn save_to_path<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
         // Acquire lock to prevent race conditions during file access
         let _lock = TOOL_PERMISSIONS_MUTEX.lock().unwrap();
-        
+
         let content = serde_json::to_string_pretty(self)?;
 
         // Ensure the directory exists before writing
@@ -117,4 +125,3 @@ impl GlobalToolPermissions {
         self.allowed_tools.iter().cloned().collect()
     }
 }
-

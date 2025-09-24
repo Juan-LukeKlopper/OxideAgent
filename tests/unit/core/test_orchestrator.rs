@@ -3,7 +3,7 @@
 use OxideAgent::config::{AgentConfig, AgentType, Config, InterfaceType};
 use OxideAgent::core::agents::Agent;
 use OxideAgent::core::orchestrator::Orchestrator;
-use OxideAgent::core::tools::{ToolRegistry};
+use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
 use tokio::sync::mpsc;
 
@@ -11,15 +11,15 @@ use tokio::sync::mpsc;
 fn test_orchestrator_new() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let original_cwd = std::env::current_dir().unwrap();
-    
+
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();
-    
+
     let config = create_test_config();
     let agent = Agent::new(&config.agent.name, &config.agent.model);
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
-    
+
     let orchestrator = Orchestrator::new(
         agent,
         tool_registry,
@@ -28,11 +28,11 @@ fn test_orchestrator_new() {
         tx,
         rx,
     );
-    
+
     // After initialization and loading state, the session history should be empty
     // since we're in a fresh temp directory with no session file
     assert_eq!(orchestrator.get_session_history().len(), 0); // Session state history is empty when no file exists
-    
+
     // Restore original working directory
     std::env::set_current_dir(&original_cwd).unwrap();
 }
@@ -41,15 +41,15 @@ fn test_orchestrator_new() {
 fn test_orchestrator_get_session_history() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let original_cwd = std::env::current_dir().unwrap();
-    
+
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();
-    
+
     let config = create_test_config();
     let agent = Agent::new(&config.agent.name, &config.agent.model);
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
-    
+
     let orchestrator = Orchestrator::new(
         agent,
         tool_registry,
@@ -58,10 +58,10 @@ fn test_orchestrator_get_session_history() {
         tx,
         rx,
     );
-    
+
     let history = orchestrator.get_session_history();
     assert_eq!(history.len(), 0); // Session state history is empty when no file exists
-    
+
     // Restore original working directory
     std::env::set_current_dir(&original_cwd).unwrap();
 }
@@ -70,15 +70,15 @@ fn test_orchestrator_get_session_history() {
 async fn test_orchestrator_load_state_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
     let original_cwd = std::env::current_dir().unwrap();
-    
+
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();
-    
+
     let config = create_test_config();
     let agent = Agent::new(&config.agent.name, &config.agent.model);
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
-    
+
     let mut orchestrator = Orchestrator::new(
         agent,
         tool_registry,
@@ -87,10 +87,10 @@ async fn test_orchestrator_load_state_empty() {
         tx,
         rx,
     );
-    
+
     let result = orchestrator.load_state();
     assert!(result.is_ok());
-    
+
     // Restore original working directory
     std::env::set_current_dir(&original_cwd).unwrap();
 }

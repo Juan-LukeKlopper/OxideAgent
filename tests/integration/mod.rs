@@ -11,7 +11,7 @@ mod mcp {
 mod core {
     mod test_mocked_external_deps;
     mod test_orchestrator_agent_interactions;
-    mod test_tool_interactions;
     mod test_tool_approval_workflow;
+    mod test_tool_interactions;
     mod tool_permissions;
 }

@@ -1,7 +1,7 @@
 use crate::core::agents::Agent;
 use crate::core::session::{SessionManager, SessionState};
-use crate::core::tools::ToolRegistry;
 use crate::core::tool_permissions::GlobalToolPermissions;
+use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
 use tokio::sync::mpsc;
@@ -32,7 +32,7 @@ impl Orchestrator {
             Some(name) => format!("session_{}.json", name),
             None => "session.json".to_string(),
         };
-        
+
         let session_state = SessionState::new();
         let global_permissions = GlobalToolPermissions::load().unwrap_or_default();
 
@@ -225,13 +225,19 @@ impl Orchestrator {
                 ToolApprovalResponse::AlwaysAllow => {
                     // Add tools to global permissions
                     for tool_call in &tool_calls {
-                        self.global_permissions.add_allowed(&tool_call.function.name);
+                        self.global_permissions
+                            .add_allowed(&tool_call.function.name);
                     }
                     // Save global permissions
                     if let Err(e) = self.global_permissions.save() {
-                        self.tx.send(AppEvent::Error(format!("Failed to save global tool permissions: {}", e))).await?;
+                        self.tx
+                            .send(AppEvent::Error(format!(
+                                "Failed to save global tool permissions: {}",
+                                e
+                            )))
+                            .await?;
                     }
-                    
+
                     // Execute tools
                     for tool_call in tool_calls {
                         let tool_output = self.execute_tool(&tool_call).await?;
@@ -253,9 +259,10 @@ impl Orchestrator {
                 ToolApprovalResponse::AlwaysAllowSession => {
                     // Add tools to session permissions
                     for tool_call in &tool_calls {
-                        self.session_state.add_allowed_tool(tool_call.function.name.clone());
+                        self.session_state
+                            .add_allowed_tool(tool_call.function.name.clone());
                     }
-                    
+
                     // Execute tools
                     for tool_call in tool_calls {
                         let tool_output = self.execute_tool(&tool_call).await?;
@@ -315,7 +322,7 @@ impl Orchestrator {
                     // Not approved
                     false
                 });
-                
+
                 if all_approved {
                     // Execute all tools without approval
                     for tool_call in tool_calls {

@@ -10,7 +10,7 @@ use tokio::sync::mpsc;
 fn test_container_new() {
     let config = create_test_config();
     let container = Container::new(config);
-    
+
     // Verify config is accessible
     assert_eq!(container.config().agent.name, "Qwen");
 }
@@ -19,10 +19,10 @@ fn test_container_new() {
 fn test_container_build_agent() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     let agent = container.build_agent();
     assert!(agent.is_ok());
-    
+
     let agent = agent.unwrap();
     assert_eq!(agent.model, "qwen3:4b");
 }
@@ -31,17 +31,20 @@ fn test_container_build_agent() {
 fn test_container_build_tool_registry() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     let tool_registry = container.build_tool_registry();
     assert!(tool_registry.is_ok());
-    
+
     let tool_registry = tool_registry.unwrap();
     let definitions = tool_registry.definitions();
-    
+
     // Should have 3 default tools: write_file, read_file, run_shell_command
     assert_eq!(definitions.len(), 3);
-    
-    let names: Vec<String> = definitions.iter().map(|t| t.function.name.clone()).collect();
+
+    let names: Vec<String> = definitions
+        .iter()
+        .map(|t| t.function.name.clone())
+        .collect();
     assert!(names.contains(&"write_file".to_string()));
     assert!(names.contains(&"read_file".to_string()));
     assert!(names.contains(&"run_shell_command".to_string()));
@@ -51,7 +54,7 @@ fn test_container_build_tool_registry() {
 fn test_container_build_session_manager() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     let session_manager = container.build_session_manager();
     assert!(session_manager.is_ok());
 }
@@ -60,12 +63,12 @@ fn test_container_build_session_manager() {
 async fn test_container_build_orchestrator() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
-    
+
     let orchestrator = container.build_orchestrator(tx, rx);
     assert!(orchestrator.is_ok());
-    
+
     // We can't access private fields directly, so we just verify the orchestrator was created
     assert!(true);
 }
@@ -74,10 +77,10 @@ async fn test_container_build_orchestrator() {
 fn test_container_config_accessors() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     // Test config accessor
     assert_eq!(container.config().agent.name, "Qwen");
-    
+
     // Test config mutable accessor (though we won't actually modify it in this test)
     let config_ref = container.config_mut();
     assert_eq!(config_ref.agent.name, "Qwen");
@@ -87,17 +90,17 @@ fn test_container_config_accessors() {
 fn test_container_multiple_build_calls() {
     let config = create_test_config();
     let mut container = Container::new(config);
-    
+
     // Building components multiple times should not cause issues
     let agent1 = container.build_agent();
     assert!(agent1.is_ok());
-    
+
     let agent2 = container.build_agent();
     assert!(agent2.is_ok());
-    
+
     let tool_registry1 = container.build_tool_registry();
     assert!(tool_registry1.is_ok());
-    
+
     let tool_registry2 = container.build_tool_registry();
     assert!(tool_registry2.is_ok());
 }

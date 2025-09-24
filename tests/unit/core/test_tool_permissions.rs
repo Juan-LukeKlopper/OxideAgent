@@ -7,16 +7,16 @@ fn test_global_tool_permissions() {
     // Test creating new permissions
     let mut permissions = GlobalToolPermissions::new();
     assert!(!permissions.is_allowed("test_tool"));
-    
+
     // Test adding a tool
     permissions.add_allowed("test_tool");
     assert!(permissions.is_allowed("test_tool"));
-    
+
     // Test listing allowed tools
     let allowed_tools = permissions.list_allowed();
     assert_eq!(allowed_tools.len(), 1);
     assert!(allowed_tools.contains(&"test_tool".to_string()));
-    
+
     // Test removing a tool
     assert!(permissions.remove_allowed("test_tool"));
     assert!(!permissions.is_allowed("test_tool"));

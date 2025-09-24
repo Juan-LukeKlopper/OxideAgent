@@ -2,11 +2,13 @@
 
 use OxideAgent::config::{AgentConfig, AgentType, Config, InterfaceType};
 use OxideAgent::core::container::Container;
-use OxideAgent::core::tools::{ReadFileTool, RunShellCommandTool, Tool, ToolRegistry, WriteFileTool};
+use OxideAgent::core::tools::{
+    ReadFileTool, RunShellCommandTool, Tool, ToolRegistry, WriteFileTool,
+};
 use OxideAgent::types::{AppEvent, ToolCall, ToolFunction};
-use tokio::sync::mpsc;
-use std::fs;
 use serde_json::json;
+use std::fs;
+use tokio::sync::mpsc;
 
 #[tokio::test]
 async fn test_tool_execution_workflow() {
@@ -32,7 +34,9 @@ async fn test_tool_execution_workflow() {
 
     // Create and build the orchestrator
     let mut container = Container::new(config);
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx).unwrap();
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .unwrap();
 
     // Test WriteFileTool directly
     let write_tool = WriteFileTool;
@@ -75,7 +79,7 @@ async fn test_tool_execution_workflow() {
 async fn test_tool_registry_integration() {
     // Test that the tool registry works correctly with orchestrator
     let mut tool_registry = ToolRegistry::new();
-    
+
     // Register tools
     tool_registry.add_tool(Box::new(WriteFileTool));
     tool_registry.add_tool(Box::new(ReadFileTool));
