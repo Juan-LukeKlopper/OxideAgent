@@ -70,36 +70,50 @@ impl SessionManager {
     pub fn load_state<P: AsRef<Path>>(path: P) -> anyhow::Result<Option<SessionState>> {
         let path = path.as_ref();
         if path.exists() {
-            match fs::read_to_string(path) {
-                Ok(content) => {
-                    if content.trim().is_empty() {
-                        // Empty file, return default session state
-                        Ok(Some(SessionState::new()))
-                    } else {
-                        // Try to parse the content
-                        match serde_json::from_str(&content) {
-                            Ok(session_state) => Ok(Some(session_state)),
-                            Err(e) => {
-                                // Log the error but don't crash
-                                eprintln!(
-                                    "Warning: Failed to parse session file '{}': {}",
-                                    path.display(),
-                                    e
-                                );
-                                eprintln!("Creating new session state as fallback.");
-                                Ok(Some(SessionState::new()))
+            // Retry mechanism for handling temporary file access issues during race conditions
+            let mut attempts = 0;
+            let max_attempts = 3;
+            
+            loop {
+                match fs::read_to_string(path) {
+                    Ok(content) => {
+                        if content.trim().is_empty() {
+                            // Empty file, return default session state
+                            return Ok(Some(SessionState::new()));
+                        } else {
+                            // Try to parse the content
+                            match serde_json::from_str(&content) {
+                                Ok(session_state) => return Ok(Some(session_state)),
+                                Err(e) => {
+                                    // Log the error but don't crash
+                                    eprintln!(
+                                        "Warning: Failed to parse session file '{}': {}",
+                                        path.display(),
+                                        e
+                                    );
+                                    eprintln!("Creating new session state as fallback.");
+                                    return Ok(Some(SessionState::new()));
+                                }
                             }
                         }
                     }
-                }
-                Err(e) => {
-                    // Log the error but don't crash
-                    eprintln!(
-                        "Warning: Failed to read session file '{}': {}",
-                        path.display(),
-                        e
-                    );
-                    Ok(Some(SessionState::new()))
+                    Err(e) => {
+                        // If it's a file access error and we haven't reached max attempts, retry
+                        if (e.kind() == std::io::ErrorKind::NotFound || 
+                            e.kind() == std::io::ErrorKind::PermissionDenied) && 
+                            attempts < max_attempts - 1 {
+                            attempts += 1;
+                            std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
+                        } else {
+                            // Log the error but don't crash
+                            eprintln!(
+                                "Warning: Failed to read session file '{}': {}",
+                                path.display(),
+                                e
+                            );
+                            return Ok(Some(SessionState::new()));
+                        }
+                    }
                 }
             }
         } else {
@@ -113,13 +127,58 @@ impl SessionManager {
         let path = path.as_ref();
         let content = serde_json::to_string_pretty(session_state)?;
 
-        // Ensure the directory exists
+        // Ensure the directory exists with retry mechanism
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            let mut attempts = 0;
+            let max_attempts = 3;
+            
+            loop {
+                match fs::create_dir_all(parent) {
+                    Ok(_) => break,
+                    Err(e) => {
+                        if attempts >= max_attempts - 1 {
+                            return Err(e.into());
+                        } else {
+                            attempts += 1;
+                            std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
+                        }
+                    }
+                }
+            }
         }
 
-        fs::write(path, content)?;
-        Ok(())
+        // Use atomic write with retry mechanism
+        let temp_path = path.with_extension(format!("tmp.{}", std::process::id()));
+        let mut attempts = 0;
+        let max_attempts = 3;
+        
+        loop {
+            match fs::write(&temp_path, content.as_bytes()) {
+                Ok(_) => {
+                    match fs::rename(&temp_path, path) {
+                        Ok(_) => return Ok(()),
+                        Err(e) => {
+                            if attempts >= max_attempts - 1 {
+                                fs::remove_file(&temp_path).ok(); // Clean up temp file
+                                return Err(e.into());
+                            } else {
+                                attempts += 1;
+                                std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if attempts >= max_attempts - 1 {
+                        fs::remove_file(&temp_path).ok(); // Clean up temp file if it exists
+                        return Err(e.into());
+                    } else {
+                        attempts += 1;
+                        std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
+                    }
+                }
+            }
+        }
     }
 
     /// List all available sessions

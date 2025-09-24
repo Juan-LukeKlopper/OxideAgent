@@ -13,7 +13,6 @@ dependencies = [
  "clap",
  "crossterm",
  "futures-util",
- "once_cell",
  "ratatui",
  "regex",
  "reqwest",
