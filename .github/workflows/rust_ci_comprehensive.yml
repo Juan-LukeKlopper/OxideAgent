@@ -35,9 +35,9 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Run tests
+    - name: Run tests single-threaded
       run: |
-        cargo test --verbose
+        cargo test -- --test-threads=1
       env:
         RUST_BACKTRACE: 1
 
