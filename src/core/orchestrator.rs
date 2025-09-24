@@ -1,6 +1,7 @@
 use crate::core::agents::Agent;
 use crate::core::session::{SessionManager, SessionState};
 use crate::core::tools::ToolRegistry;
+use crate::core::tool_permissions::GlobalToolPermissions;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
 use tokio::sync::mpsc;
@@ -10,10 +11,12 @@ pub struct Orchestrator {
     tool_registry: ToolRegistry,
     client: Client,
     session_file: String,
+    session_state: SessionState,
     no_stream: bool,
     tx: mpsc::Sender<AppEvent>,
     rx: mpsc::Receiver<AppEvent>,
     pending_tool_calls: Option<Vec<ToolCall>>,
+    global_permissions: GlobalToolPermissions,
 }
 
 impl Orchestrator {
@@ -29,16 +32,21 @@ impl Orchestrator {
             Some(name) => format!("session_{}.json", name),
             None => "session.json".to_string(),
         };
+        
+        let session_state = SessionState::new();
+        let global_permissions = GlobalToolPermissions::load().unwrap_or_default();
 
         Self {
             agent,
             tool_registry,
             client: Client::new(),
             session_file,
+            session_state,
             no_stream,
             tx,
             rx,
             pending_tool_calls: None,
+            global_permissions,
         }
     }
 
@@ -47,14 +55,20 @@ impl Orchestrator {
     }
 
     pub fn load_state(&mut self) -> anyhow::Result<()> {
-        if let Some(session_state) = SessionManager::load_state(&self.session_file)? {
-            self.agent.history = session_state.history().clone();
+        match SessionManager::load_state(&self.session_file)? {
+            Some(session_state) => {
+                self.session_state = session_state;
+            }
+            None => {
+                // File doesn't exist, use default session state
+                self.session_state = SessionState::new();
+            }
         }
         Ok(())
     }
 
     fn save_state(&mut self) -> anyhow::Result<()> {
-        let mut session_state = SessionState::new();
+        let mut session_state = self.session_state.clone();
         session_state.set_history(self.agent.history.clone());
         SessionManager::save_state(&self.session_file, &session_state)?;
         Ok(())
@@ -69,6 +83,7 @@ impl Orchestrator {
 
         // Reset agent history
         self.agent.history.clear();
+        self.session_state = SessionState::new();
 
         // Load new session
         self.load_state()?;
@@ -86,6 +101,10 @@ impl Orchestrator {
                 }
                 AppEvent::ToolApproval(response) => {
                     if let Err(e) = self.handle_tool_approval(response).await {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    }
+                    // After handling tool approval, continue the conversation
+                    if let Err(e) = self.chat_with_agent().await {
                         self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
                 }
@@ -164,6 +183,12 @@ impl Orchestrator {
                         self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
                 },
+                AppEvent::ContinueConversation => {
+                    // Continue the conversation after tool execution
+                    if let Err(e) = self.chat_with_agent().await {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    }
+                }
                 _ => {}
             }
         }
@@ -194,8 +219,60 @@ impl Orchestrator {
                         ));
                     }
                     self.save_state()?;
-                    // Let the agent process the tool output
-                    return self.chat_with_agent().await;
+                    // Send event to continue conversation
+                    self.tx.send(AppEvent::ContinueConversation).await?;
+                }
+                ToolApprovalResponse::AlwaysAllow => {
+                    // Add tools to global permissions
+                    for tool_call in &tool_calls {
+                        self.global_permissions.add_allowed(&tool_call.function.name);
+                    }
+                    // Save global permissions
+                    if let Err(e) = self.global_permissions.save() {
+                        self.tx.send(AppEvent::Error(format!("Failed to save global tool permissions: {}", e))).await?;
+                    }
+                    
+                    // Execute tools
+                    for tool_call in tool_calls {
+                        let tool_output = self.execute_tool(&tool_call).await?;
+                        self.tx
+                            .send(AppEvent::ToolResult(
+                                tool_call.function.name.clone(),
+                                tool_output.clone(),
+                            ))
+                            .await?;
+                        self.agent.add_user_message(&format!(
+                            "The tool '{}' produced this output:\n{}",
+                            tool_call.function.name, tool_output
+                        ));
+                    }
+                    self.save_state()?;
+                    // Send event to continue conversation
+                    self.tx.send(AppEvent::ContinueConversation).await?;
+                }
+                ToolApprovalResponse::AlwaysAllowSession => {
+                    // Add tools to session permissions
+                    for tool_call in &tool_calls {
+                        self.session_state.add_allowed_tool(tool_call.function.name.clone());
+                    }
+                    
+                    // Execute tools
+                    for tool_call in tool_calls {
+                        let tool_output = self.execute_tool(&tool_call).await?;
+                        self.tx
+                            .send(AppEvent::ToolResult(
+                                tool_call.function.name.clone(),
+                                tool_output.clone(),
+                            ))
+                            .await?;
+                        self.agent.add_user_message(&format!(
+                            "The tool '{}' produced this output:\n{}",
+                            tool_call.function.name, tool_output
+                        ));
+                    }
+                    self.save_state()?;
+                    // Send event to continue conversation
+                    self.tx.send(AppEvent::ContinueConversation).await?;
                 }
                 ToolApprovalResponse::Deny => {
                     self.agent
@@ -204,16 +281,6 @@ impl Orchestrator {
                         .send(AppEvent::AgentMessage("Tool execution denied.".to_string()))
                         .await?;
                     self.save_state()?;
-                    return Ok(());
-                }
-                // TODO: Implement AlwaysAllow and AlwaysAllowSession
-                _ => {
-                    self.tx
-                        .send(AppEvent::Error(
-                            "This approval mode is not implemented yet.".to_string(),
-                        ))
-                        .await?;
-                    return Ok(());
                 }
             }
         }
@@ -235,10 +302,43 @@ impl Orchestrator {
 
         if let Some(response) = response {
             if let Some(tool_calls) = &response.tool_calls {
-                self.tx
-                    .send(AppEvent::ToolRequest(tool_calls.clone()))
-                    .await?;
-                self.pending_tool_calls = Some(tool_calls.clone());
+                // Check if all tools are already approved
+                let all_approved = tool_calls.iter().all(|tool_call| {
+                    // Check global permissions first
+                    if self.global_permissions.is_allowed(&tool_call.function.name) {
+                        return true;
+                    }
+                    // Check session permissions
+                    if self.session_state.is_tool_allowed(&tool_call.function.name) {
+                        return true;
+                    }
+                    // Not approved
+                    false
+                });
+                
+                if all_approved {
+                    // Execute all tools without approval
+                    for tool_call in tool_calls {
+                        let tool_output = self.execute_tool(tool_call).await?;
+                        self.tx
+                            .send(AppEvent::ToolResult(
+                                tool_call.function.name.clone(),
+                                tool_output.clone(),
+                            ))
+                            .await?;
+                        self.agent.add_user_message(&format!(
+                            "The tool '{}' produced this output:\n{}",
+                            tool_call.function.name, tool_output
+                        ));
+                    }
+                    self.save_state()?;
+                } else {
+                    // Request approval
+                    self.tx
+                        .send(AppEvent::ToolRequest(tool_calls.clone()))
+                        .await?;
+                    self.pending_tool_calls = Some(tool_calls.clone());
+                }
             } else if self.no_stream {
                 // For non-streaming responses, we need to send AgentMessage to display the content
                 self.tx
@@ -263,6 +363,6 @@ impl Orchestrator {
     }
 
     pub fn get_session_history(&self) -> &Vec<ChatMessage> {
-        &self.agent.history
+        self.session_state.history()
     }
 }

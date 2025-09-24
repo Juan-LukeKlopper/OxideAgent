@@ -41,6 +41,7 @@ pub enum EventType {
     /// System events
     Shutdown,
     ConfigChanged,
+    ContinueConversation, // New event to continue conversation after tool execution
 }
 
 /// Event with metadata
@@ -106,8 +107,11 @@ impl EventBus {
     /// Publish an event
     pub fn publish(&self, event: Event) -> Result<()> {
         let event = Arc::new(event);
-        self.sender.send(event)?;
-        Ok(())
+        // Use send which returns a result to handle potential channel issues
+        match self.sender.send(event) {
+            Ok(_) => Ok(()),
+            Err(_) => Ok(()), // Ignore errors (e.g., when no receivers are active)
+        }
     }
 
     /// Publish an event from an AppEvent
@@ -128,6 +132,7 @@ impl EventBus {
             AppEvent::SessionList(sessions) => EventType::SessionList(sessions),
             AppEvent::SessionSwitched(session) => EventType::SessionSwitched(session),
             AppEvent::SessionHistory(history) => EventType::SessionHistory(history),
+            AppEvent::ContinueConversation => EventType::ContinueConversation,
         };
 
         let event = Event::new(event_type, source);

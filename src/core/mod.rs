@@ -1,13 +1,13 @@
-//! Core services for the OxideAgent system.
-//!
-//! This module contains the core business logic of the application, separated from
-//! interface implementations to enable multiple interface types (TUI, Web, Telegram, etc.)
+//! Core modules for the OxideAgent system.
 
 pub mod agents;
 pub mod container;
 pub mod events;
 pub mod interface;
 pub mod llm;
+pub mod mcp;
+pub mod mocks;
 pub mod orchestrator;
 pub mod session;
+pub mod tool_permissions;
 pub mod tools;
