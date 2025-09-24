@@ -11,6 +11,12 @@ pub struct MockOllamaClient {
     pub call_count: usize,
 }
 
+impl Default for MockOllamaClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockOllamaClient {
     pub fn new() -> Self {
         Self {
@@ -67,6 +73,12 @@ pub struct MockFileSystem {
     pub write_results: HashMap<String, Result<(), String>>,
 }
 
+impl Default for MockFileSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockFileSystem {
     pub fn new() -> Self {
         Self {
@@ -117,6 +129,12 @@ impl MockFileSystem {
 pub struct MockShellExecutor {
     pub command_outputs: HashMap<String, Result<String, String>>,
     pub call_log: Vec<String>,
+}
+
+impl Default for MockShellExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MockShellExecutor {
