@@ -34,7 +34,7 @@ impl GlobalToolPermissions {
             // Retry mechanism for handling temporary file access issues during race conditions
             let mut attempts = 0;
             let max_attempts = 3;
-            
+
             loop {
                 match fs::read_to_string(path) {
                     Ok(content) => {
@@ -46,12 +46,19 @@ impl GlobalToolPermissions {
                         }
                         match serde_json::from_str(&content) {
                             Ok(permissions) => {
-                                eprintln!("DEBUG: Successfully parsed permissions: {:?}", permissions);
+                                eprintln!(
+                                    "DEBUG: Successfully parsed permissions: {:?}",
+                                    permissions
+                                );
                                 return Ok(permissions);
-                            },
+                            }
                             Err(e) => {
                                 // Log error but don't crash
-                                eprintln!("Warning: Failed to parse tool permissions file '{}': {}", path.display(), e);
+                                eprintln!(
+                                    "Warning: Failed to parse tool permissions file '{}': {}",
+                                    path.display(),
+                                    e
+                                );
                                 eprintln!("Using default tool permissions as fallback.");
                                 return Ok(Self::default());
                             }
@@ -59,9 +66,14 @@ impl GlobalToolPermissions {
                     }
                     Err(e) => {
                         // If it's a file access error and we haven't reached max attempts, retry
-                        if e.kind() == std::io::ErrorKind::NotFound || attempts >= max_attempts - 1 {
+                        if e.kind() == std::io::ErrorKind::NotFound || attempts >= max_attempts - 1
+                        {
                             // Log error but don't crash
-                            eprintln!("Warning: Failed to read tool permissions file '{}': {}", path.display(), e);
+                            eprintln!(
+                                "Warning: Failed to read tool permissions file '{}': {}",
+                                path.display(),
+                                e
+                            );
                             return Ok(Self::default());
                         } else {
                             attempts += 1;
@@ -93,11 +105,11 @@ impl GlobalToolPermissions {
 
         // Use atomic write to prevent corruption from concurrent writes
         let temp_path = path.with_extension(format!("tmp.{}", std::process::id()));
-        
+
         // Retry mechanism for handling temporary file access issues during race conditions
         let mut attempts = 0;
         let max_attempts = 3;
-        
+
         loop {
             match std::fs::write(&temp_path, content.as_bytes()) {
                 Ok(_) => {
@@ -105,7 +117,9 @@ impl GlobalToolPermissions {
                     match std::fs::rename(&temp_path, path) {
                         Ok(_) => return Ok(()),
                         Err(e) => {
-                            if attempts >= max_attempts - 1 || e.kind() != std::io::ErrorKind::AlreadyExists {
+                            if attempts >= max_attempts - 1
+                                || e.kind() != std::io::ErrorKind::AlreadyExists
+                            {
                                 std::fs::remove_file(&temp_path).ok(); // Clean up temp file if rename failed
                                 return Err(e.into());
                             } else {

@@ -10,21 +10,23 @@ use tokio::sync::mpsc;
 #[test]
 fn test_orchestrator_new() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    
+
     // Use a guard to ensure we always restore the original directory
     struct DirectoryGuard {
         original_dir: std::path::PathBuf,
     }
-    
+
     impl Drop for DirectoryGuard {
         fn drop(&mut self) {
             // Ignore errors when restoring directory, as it might have been deleted
             let _ = std::env::set_current_dir(&self.original_dir);
         }
     }
-    
+
     let original_cwd = std::env::current_dir().unwrap();
-    let _guard = DirectoryGuard { original_dir: original_cwd.clone() };
+    let _guard = DirectoryGuard {
+        original_dir: original_cwd.clone(),
+    };
 
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();
@@ -53,21 +55,23 @@ fn test_orchestrator_new() {
 #[test]
 fn test_orchestrator_get_session_history() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    
+
     // Use a guard to ensure we always restore the original directory
     struct DirectoryGuard {
         original_dir: std::path::PathBuf,
     }
-    
+
     impl Drop for DirectoryGuard {
         fn drop(&mut self) {
             // Ignore errors when restoring directory, as it might have been deleted
             let _ = std::env::set_current_dir(&self.original_dir);
         }
     }
-    
+
     let original_cwd = std::env::current_dir().unwrap();
-    let _guard = DirectoryGuard { original_dir: original_cwd.clone() };
+    let _guard = DirectoryGuard {
+        original_dir: original_cwd.clone(),
+    };
 
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();
@@ -95,21 +99,23 @@ fn test_orchestrator_get_session_history() {
 #[test]
 fn test_orchestrator_load_state_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
-    
+
     // Use a guard to ensure we always restore the original directory
     struct DirectoryGuard {
         original_dir: std::path::PathBuf,
     }
-    
+
     impl Drop for DirectoryGuard {
         fn drop(&mut self) {
             // Ignore errors when restoring directory, as it might have been deleted
             let _ = std::env::set_current_dir(&self.original_dir);
         }
     }
-    
+
     let original_cwd = std::env::current_dir().unwrap();
-    let _guard = DirectoryGuard { original_dir: original_cwd.clone() };
+    let _guard = DirectoryGuard {
+        original_dir: original_cwd.clone(),
+    };
 
     // Change to temp directory for testing to isolate file operations
     std::env::set_current_dir(&temp_dir).unwrap();

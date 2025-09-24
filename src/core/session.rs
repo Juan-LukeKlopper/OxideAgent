@@ -73,7 +73,7 @@ impl SessionManager {
             // Retry mechanism for handling temporary file access issues during race conditions
             let mut attempts = 0;
             let max_attempts = 3;
-            
+
             loop {
                 match fs::read_to_string(path) {
                     Ok(content) => {
@@ -99,9 +99,10 @@ impl SessionManager {
                     }
                     Err(e) => {
                         // If it's a file access error and we haven't reached max attempts, retry
-                        if (e.kind() == std::io::ErrorKind::NotFound || 
-                            e.kind() == std::io::ErrorKind::PermissionDenied) && 
-                            attempts < max_attempts - 1 {
+                        if (e.kind() == std::io::ErrorKind::NotFound
+                            || e.kind() == std::io::ErrorKind::PermissionDenied)
+                            && attempts < max_attempts - 1
+                        {
                             attempts += 1;
                             std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
                         } else {
@@ -131,7 +132,7 @@ impl SessionManager {
         if let Some(parent) = path.parent() {
             let mut attempts = 0;
             let max_attempts = 3;
-            
+
             loop {
                 match fs::create_dir_all(parent) {
                     Ok(_) => break,
@@ -151,7 +152,7 @@ impl SessionManager {
         let temp_path = path.with_extension(format!("tmp.{}", std::process::id()));
         let mut attempts = 0;
         let max_attempts = 3;
-        
+
         loop {
             match fs::write(&temp_path, content.as_bytes()) {
                 Ok(_) => {
