@@ -56,7 +56,7 @@ fn test_toml_config_loading() {
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(toml_content.as_bytes()).unwrap();
     let temp_path = temp_file.path().to_path_buf();
-    
+
     // Copy the content to a new file that we can read
     let test_file_path = temp_path.with_extension("toml");
     std::fs::write(&test_file_path, toml_content).unwrap();
@@ -91,7 +91,7 @@ fn test_yaml_config_loading() {
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(yaml_content.as_bytes()).unwrap();
     let temp_path = temp_file.path().to_path_buf();
-    
+
     // Copy the content to a new file that we can read
     let test_file_path = temp_path.with_extension("yaml");
     std::fs::write(&test_file_path, yaml_content).unwrap();
