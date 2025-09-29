@@ -195,10 +195,10 @@ impl EventFilter {
 
     /// Check if an event matches the filter
     pub fn matches(&self, event: &Event) -> bool {
-        if let Some(ref source) = self.source_filter {
-            if &event.source != source {
-                return false;
-            }
+        if let Some(ref source) = self.source_filter
+            && &event.source != source
+        {
+            return false;
         }
 
         if let Some(ref destination) = self.destination_filter {

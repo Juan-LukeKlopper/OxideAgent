@@ -198,21 +198,19 @@ impl SessionManager {
             let entry = entry?;
             let path = entry.path();
 
-            if path.is_file() {
-                if let Some(file_name) = path.file_name() {
-                    if let Some(file_name_str) = file_name.to_str() {
-                        if file_name_str.starts_with("session_") && file_name_str.ends_with(".json")
-                        {
-                            // Extract session name from file name (remove "session_" prefix and ".json" suffix)
-                            let session_name = file_name_str
-                                .strip_prefix("session_")
-                                .unwrap()
-                                .strip_suffix(".json")
-                                .unwrap();
-                            sessions.push(session_name.to_string());
-                        }
-                    }
-                }
+            if path.is_file()
+                && let Some(file_name) = path.file_name()
+                && let Some(file_name_str) = file_name.to_str()
+                && file_name_str.starts_with("session_")
+                && file_name_str.ends_with(".json")
+            {
+                // Extract session name from file name (remove "session_" prefix and ".json" suffix)
+                let session_name = file_name_str
+                    .strip_prefix("session_")
+                    .unwrap()
+                    .strip_suffix(".json")
+                    .unwrap();
+                sessions.push(session_name.to_string());
             }
         }
 

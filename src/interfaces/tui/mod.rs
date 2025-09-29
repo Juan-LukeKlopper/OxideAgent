@@ -218,10 +218,9 @@ impl Tui {
             }
             AppEvent::AgentStreamEnd => {
                 // Clean up any empty agent messages that might have been created
-                if let Some(Message::Agent(_, content)) = self.messages.last() {
-                    if content.is_empty() {
-                        self.messages.pop();
-                    }
+                if let Some(Message::Agent(_, content)) = self.messages.last()
+                    && content.is_empty() {
+                    self.messages.pop();
                 }
             }
             AppEvent::AgentMessage(content) => {
