@@ -55,10 +55,13 @@ fn test_toml_config_loading() {
 
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(toml_content.as_bytes()).unwrap();
-    let temp_path = temp_file.into_temp_path();
-    temp_path.persist("/tmp/test_mcp.toml").unwrap();
+    let temp_path = temp_file.path().to_path_buf();
+    
+    // Copy the content to a new file that we can read
+    let test_file_path = temp_path.with_extension("toml");
+    std::fs::write(&test_file_path, toml_content).unwrap();
 
-    let config = McpConfigFile::load_from_file("/tmp/test_mcp.toml").unwrap();
+    let config = McpConfigFile::load_from_file(&test_file_path).unwrap();
     assert_eq!(config.version, "1.0");
     assert_eq!(config.servers.len(), 1);
 
@@ -72,7 +75,7 @@ fn test_toml_config_loading() {
     }
 
     // Clean up
-    let _ = std::fs::remove_file("/tmp/test_mcp.toml");
+    let _ = std::fs::remove_file(&test_file_path);
 }
 
 #[test]
@@ -87,10 +90,13 @@ fn test_yaml_config_loading() {
 
     let mut temp_file = NamedTempFile::new().unwrap();
     temp_file.write_all(yaml_content.as_bytes()).unwrap();
-    let temp_path = temp_file.into_temp_path();
-    temp_path.persist("/tmp/test_mcp.yaml").unwrap();
+    let temp_path = temp_file.path().to_path_buf();
+    
+    // Copy the content to a new file that we can read
+    let test_file_path = temp_path.with_extension("yaml");
+    std::fs::write(&test_file_path, yaml_content).unwrap();
 
-    let config = McpConfigFile::load_from_file("/tmp/test_mcp.yaml").unwrap();
+    let config = McpConfigFile::load_from_file(&test_file_path).unwrap();
     assert_eq!(config.version, "1.0");
     assert_eq!(config.servers.len(), 1);
 
@@ -104,7 +110,7 @@ fn test_yaml_config_loading() {
     }
 
     // Clean up
-    let _ = std::fs::remove_file("/tmp/test_mcp.yaml");
+    let _ = std::fs::remove_file(&test_file_path);
 }
 
 #[test]
