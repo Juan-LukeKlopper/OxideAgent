@@ -3,6 +3,7 @@ name = "OxideAgent"
 version = "0.1.0"
 edition = "2024"
 authors = ["Juan-luke Klopper"]
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0.98"
