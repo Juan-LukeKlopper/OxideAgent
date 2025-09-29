@@ -16,7 +16,7 @@ pub struct GlobalToolPermissions {
     allowed_tools: HashSet<String>,
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl GlobalToolPermissions {
     /// Create a new empty global tool permissions instance
     pub fn new() -> Self {

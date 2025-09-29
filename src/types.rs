@@ -10,7 +10,7 @@ pub enum ToolApprovalResponse {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]  // Variants are used in the application and form part of the public API
+#[allow(dead_code)] // Variants are used in the application and form part of the public API
 pub enum AppEvent {
     UserInput(String),
     ToolApproval(ToolApprovalResponse),

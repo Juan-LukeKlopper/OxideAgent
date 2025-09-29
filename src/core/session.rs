@@ -16,7 +16,7 @@ pub struct SessionState {
     allowed_tools: Vec<String>,
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl SessionState {
     pub fn new() -> Self {
         Self {

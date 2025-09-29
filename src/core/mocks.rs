@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 // Mock for the Ollama API client
-#[allow(dead_code)]  // Fields and methods are used in tests
+#[allow(dead_code)] // Fields and methods are used in tests
 pub struct MockOllamaClient {
     pub responses: Vec<serde_json::Value>,
     pub call_count: usize,
@@ -18,7 +18,7 @@ impl Default for MockOllamaClient {
     }
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockOllamaClient {
     pub fn new() -> Self {
         Self {
@@ -81,7 +81,7 @@ impl Default for MockFileSystem {
     }
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockFileSystem {
     pub fn new() -> Self {
         Self {
@@ -140,7 +140,7 @@ impl Default for MockShellExecutor {
     }
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockShellExecutor {
     pub fn new() -> Self {
         Self {
@@ -182,7 +182,7 @@ pub struct MockWriteFileTool {
     pub mock_file_system: std::sync::Arc<std::sync::Mutex<MockFileSystem>>,
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockWriteFileTool {
     pub fn new(mock_file_system: std::sync::Arc<std::sync::Mutex<MockFileSystem>>) -> Self {
         Self { mock_file_system }
@@ -239,7 +239,7 @@ pub struct MockReadFileTool {
     pub mock_file_system: std::sync::Arc<std::sync::Mutex<MockFileSystem>>,
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockReadFileTool {
     pub fn new(mock_file_system: std::sync::Arc<std::sync::Mutex<MockFileSystem>>) -> Self {
         Self { mock_file_system }
@@ -291,7 +291,7 @@ pub struct MockRunShellCommandTool {
     pub mock_shell_executor: std::sync::Arc<std::sync::Mutex<MockShellExecutor>>,
 }
 
-#[allow(dead_code)]  // Methods are used in tests and form part of the public API
+#[allow(dead_code)] // Methods are used in tests and form part of the public API
 impl MockRunShellCommandTool {
     pub fn new(mock_shell_executor: std::sync::Arc<std::sync::Mutex<MockShellExecutor>>) -> Self {
         Self {
