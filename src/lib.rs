@@ -1,5 +1,4 @@
 #![allow(non_snake_case)]
-#![feature(let_chains)]
 
 //! OxideAgent library crate.
 //!
