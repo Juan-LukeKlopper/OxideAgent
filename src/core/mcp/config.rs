@@ -92,6 +92,7 @@ pub enum McpServerType {
     },
 }
 
+#[allow(dead_code)]  // Methods are used in tests and form part of the public API
 impl McpConfigFile {
     /// Load configuration from a file, automatically detecting the format based on extension
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {

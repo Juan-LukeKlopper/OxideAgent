@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 
 /// Comprehensive event types for the application
 #[derive(Debug, Clone)]
+#[allow(dead_code)]  // Variants are used in AppEvent conversions
 pub enum EventType {
     /// User input events
     UserInput(String),
@@ -46,6 +47,7 @@ pub enum EventType {
 
 /// Event with metadata
 #[derive(Debug, Clone)]
+#[allow(dead_code)]  // Fields are used in EventFilter::matches
 pub struct Event {
     /// The event type
     pub event_type: EventType,
@@ -60,6 +62,7 @@ pub struct Event {
     pub timestamp: std::time::SystemTime,
 }
 
+#[allow(dead_code)]  // Functions are used to create Event instances
 impl Event {
     /// Create a new event
     pub fn new(event_type: EventType, source: String) -> Self {
@@ -87,11 +90,13 @@ impl Event {
 }
 
 /// Event bus for asynchronous communication between components
+#[allow(dead_code)]  // Fields are used in EventBus methods
 pub struct EventBus {
     /// Broadcast sender for events
     sender: broadcast::Sender<Arc<Event>>,
 }
 
+#[allow(dead_code)]  // Methods are part of the EventBus API
 impl EventBus {
     /// Create a new event bus
     pub fn new() -> Self {
@@ -147,6 +152,7 @@ impl Default for EventBus {
 }
 
 /// Event filter for routing events
+#[allow(dead_code)]  // Fields are used in EventFilter::matches
 pub struct EventFilter {
     /// Source filter
     source_filter: Option<String>,
@@ -158,6 +164,7 @@ pub struct EventFilter {
     event_type_filter: Option<EventType>,
 }
 
+#[allow(dead_code)]  // Methods are part of the EventFilter API
 impl EventFilter {
     /// Create a new event filter
     pub fn new() -> Self {

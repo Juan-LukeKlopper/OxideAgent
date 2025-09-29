@@ -18,6 +18,7 @@ pub struct Container {
     config: Arc<Config>,
     agent: Option<Agent>,
     tool_registry: Option<ToolRegistry>,
+    #[allow(dead_code)]
     session_manager: Option<SessionManager>,
 }
 
@@ -38,6 +39,7 @@ impl Container {
     }
 
     /// Get a mutable reference to the configuration
+    #[allow(dead_code)]
     pub fn config_mut(&mut self) -> &mut Config {
         Arc::get_mut(&mut self.config).expect("Config is shared")
     }
@@ -67,6 +69,7 @@ impl Container {
     }
 
     /// Build the session manager
+    #[allow(dead_code)]
     pub fn build_session_manager(&mut self) -> Result<&mut SessionManager> {
         if self.session_manager.is_none() {
             // SessionManager is a unit struct with only static methods

@@ -8,6 +8,7 @@ use tokio::sync::mpsc;
 
 /// Trait for handling user input from different sources
 #[async_trait::async_trait]
+#[allow(dead_code)]  // Trait methods are part of public API
 pub trait InputHandler {
     /// Handle user input from the interface
     async fn handle_input(&mut self, input: String) -> Result<()>;
@@ -15,12 +16,14 @@ pub trait InputHandler {
 
 /// Trait for sending output to different interfaces
 #[async_trait::async_trait]
+#[allow(dead_code)]  // Trait methods are part of public API
 pub trait OutputHandler {
     /// Send output to the interface
     async fn send_output(&mut self, output: AppEvent) -> Result<()>;
 }
 
 /// Trait for emitting events to interfaces
+#[allow(dead_code)]  // Trait methods are part of public API
 pub trait EventEmitter {
     /// Get the sender for sending events to the interface
     fn get_event_sender(&self) -> mpsc::Sender<AppEvent>;
@@ -31,6 +34,7 @@ pub trait EventEmitter {
 
 /// Trait that combines all interface traits
 #[async_trait::async_trait]
+#[allow(dead_code)]  // Trait methods are part of public API
 pub trait Interface: InputHandler + OutputHandler + EventEmitter + Send {
     /// Initialize the interface
     async fn init(&mut self) -> Result<()>;

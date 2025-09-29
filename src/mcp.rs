@@ -1,15 +1,25 @@
+//! MCP (Model Context Protocol) integration for the OxideAgent system.
+//!
+//! This module provides functionality for connecting to and managing MCP servers,
+//! both remote and local, with support for various deployment methods.
+
 use crate::tools::{Tool, ToolProfile};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// Definition of an MCP tool
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct McpToolDefinition {
+    /// Name of the tool
     pub name: String,
+    /// Description of what the tool does
     pub description: String,
+    /// JSON schema for the tool's parameters
     pub parameters: Value,
 }
 
+/// Adapter that wraps an MCP tool definition to implement the Tool trait
 pub struct McpToolAdapter {
     definition: McpToolDefinition,
     mcp_url: String,
@@ -17,6 +27,7 @@ pub struct McpToolAdapter {
 }
 
 impl McpToolAdapter {
+    /// Create a new MCP tool adapter
     pub fn new(
         definition: McpToolDefinition,
         mcp_url: String,
@@ -59,6 +70,7 @@ impl Tool for McpToolAdapter {
     }
 }
 
+/// Connection to an MCP server
 pub struct McpConnection {
     client: Client,
     url: String,
@@ -66,6 +78,7 @@ pub struct McpConnection {
 }
 
 impl McpConnection {
+    /// Create a new MCP connection
     pub fn new(url: String, auth_token: Option<String>) -> Self {
         Self {
             client: Client::new(),
@@ -74,6 +87,7 @@ impl McpConnection {
         }
     }
 
+    /// Discover available tools from the MCP server
     pub async fn discover_tools(&self) -> anyhow::Result<Vec<McpToolDefinition>> {
         let mut request = self.client.get(&format!("{}/tools", self.url));
         if let Some(token) = &self.auth_token {
@@ -84,10 +98,12 @@ impl McpConnection {
         Ok(tools)
     }
 
+    /// Get the URL of the MCP server
     pub fn url(&self) -> String {
         self.url.clone()
     }
 
+    /// Get the authentication token for the MCP server
     pub fn auth_token(&self) -> Option<String> {
         self.auth_token.clone()
     }

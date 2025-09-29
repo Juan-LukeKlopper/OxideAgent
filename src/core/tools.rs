@@ -4,6 +4,7 @@ use std::fs;
 use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]  // Variants may be used in different configurations
 pub enum ToolProfile {
     File,
     Shell,
@@ -12,6 +13,7 @@ pub enum ToolProfile {
 }
 
 // The main trait for any tool that can be executed by the agent.
+#[allow(dead_code)]  // Trait methods are part of the public API
 pub trait Tool: Send + Sync {
     fn name(&self) -> String;
     fn description(&self) -> String;
@@ -30,6 +32,7 @@ pub struct ToolRegistry {
     tools: Vec<Box<dyn Tool>>,
 }
 
+#[allow(dead_code)]  // Methods are used in the application and form part of the public API
 impl ToolRegistry {
     pub fn new() -> Self {
         Self { tools: Vec::new() }
