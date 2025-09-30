@@ -169,8 +169,8 @@ pub fn create_mock_agent() -> Agent {
 }
 
 /// Create a test configuration
-pub fn create_test_config() -> OxideAgent::config::Config {
-    OxideAgent::config::Config {
+pub fn create_test_config() -> OxideAgent::Config {
+    OxideAgent::Config {
         agent: OxideAgent::config::AgentConfig {
             agent_type: OxideAgent::config::AgentType::Qwen,
             model: "qwen3:4b".to_string(),
@@ -180,8 +180,17 @@ pub fn create_test_config() -> OxideAgent::config::Config {
         no_stream: false,
         session: Some("test_session".to_string()),
         list_sessions: false,
-        mcp_server: None,
-        mcp_auth_token: None,
+        mcp: OxideAgent::config::MCPConfig {
+            server: None,
+            auth_token: None,
+            tools: vec![],
+        },
         interface: OxideAgent::config::InterfaceType::Tui,
+        llm: OxideAgent::config::LLMConfig {
+            provider: "ollama".to_string(),
+            api_base: None,
+            api_key: None,
+            model: None,
+        },
     }
 }

@@ -192,8 +192,23 @@ impl SessionManager {
             sessions.push("default".to_string());
         }
 
-        // Look for named session files
-        let entries = fs::read_dir(".")?;
+        // Look for named session files with retry mechanism to handle race conditions
+        let mut attempts = 0;
+        let max_attempts = 3;
+        let entries = loop {
+            match fs::read_dir(".") {
+                Ok(dir_entries) => break dir_entries,
+                Err(e) => {
+                    if attempts >= max_attempts - 1 {
+                        return Err(e.into());
+                    } else {
+                        attempts += 1;
+                        std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
+                    }
+                }
+            }
+        };
+
         for entry in entries {
             let entry = entry?;
             let path = entry.path();

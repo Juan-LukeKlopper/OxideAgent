@@ -3,11 +3,11 @@ use clap::{Parser, ValueEnum};
 #[derive(Parser, Debug)]
 #[command(name = "LLM CLI", about = "Chat with local Ollama models")]
 pub struct Args {
-    #[arg(long, value_enum, default_value = "qwen")]
-    pub agent: AgentType,
+    #[arg(long, value_enum)]
+    pub agent: Option<AgentType>,
 
-    #[arg(long, default_value_t = false)]
-    pub no_stream: bool,
+    #[arg(long)]
+    pub no_stream: Option<bool>,
 
     #[arg(
         long,
@@ -15,8 +15,8 @@ pub struct Args {
     )]
     pub session: Option<String>,
 
-    #[arg(long, help = "List all available sessions", default_value_t = false)]
-    pub list_sessions: bool,
+    #[arg(long, help = "List all available sessions")]
+    pub list_sessions: Option<bool>,
 
     #[arg(long, help = "URL of an MCP server to connect to")]
     pub mcp_server: Option<String>,
@@ -24,13 +24,15 @@ pub struct Args {
     #[arg(long, help = "Authentication token for the MCP server")]
     pub mcp_auth_token: Option<String>,
 
+    #[arg(long, value_enum, help = "Interface type to use")]
+    pub interface: Option<InterfaceType>,
+
     #[arg(
         long,
-        value_enum,
-        default_value = "tui",
-        help = "Interface type to use"
+        value_name = "CONFIG_FILE",
+        help = "Path to a configuration file (JSON, YAML, or TOML format)"
     )]
-    pub interface: InterfaceType,
+    pub config: Option<String>,
 }
 
 #[derive(ValueEnum, Debug, Clone)]

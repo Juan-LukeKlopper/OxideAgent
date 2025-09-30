@@ -3,7 +3,7 @@
 //! This module implements a service container for managing dependencies
 //! between components in the application.
 
-use crate::config::Config;
+use crate::config::OxideConfig;
 use crate::core::agents::Agent;
 use crate::core::orchestrator::Orchestrator;
 use crate::core::session::SessionManager;
@@ -15,7 +15,7 @@ use tokio::sync::mpsc;
 
 /// Service container for managing dependencies
 pub struct Container {
-    config: Arc<Config>,
+    config: Arc<OxideConfig>,
     agent: Option<Agent>,
     tool_registry: Option<ToolRegistry>,
     #[allow(dead_code)]
@@ -24,7 +24,7 @@ pub struct Container {
 
 impl Container {
     /// Create a new container with the given configuration
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: OxideConfig) -> Self {
         Self {
             config: Arc::new(config),
             agent: None,
@@ -34,13 +34,13 @@ impl Container {
     }
 
     /// Get a reference to the configuration
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &OxideConfig {
         &self.config
     }
 
     /// Get a mutable reference to the configuration
     #[allow(dead_code)]
-    pub fn config_mut(&mut self) -> &mut Config {
+    pub fn config_mut(&mut self) -> &mut OxideConfig {
         Arc::get_mut(&mut self.config).expect("Config is shared")
     }
 

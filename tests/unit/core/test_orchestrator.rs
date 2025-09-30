@@ -1,6 +1,6 @@
 //! Unit tests for the orchestrator module using mock objects.
 
-use OxideAgent::config::{AgentConfig, AgentType, Config, InterfaceType};
+use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
 use OxideAgent::core::agents::Agent;
 use OxideAgent::core::orchestrator::Orchestrator;
 use OxideAgent::core::tools::ToolRegistry;
@@ -158,8 +158,17 @@ fn create_test_config() -> Config {
         no_stream: false,
         session: Some("test_session".to_string()),
         list_sessions: false,
-        mcp_server: None,
-        mcp_auth_token: None,
         interface: InterfaceType::Tui,
+        mcp: OxideAgent::config::MCPConfig {
+            server: None,
+            auth_token: None,
+            tools: vec![],
+        },
+        llm: OxideAgent::config::LLMConfig {
+            provider: "ollama".to_string(),
+            api_base: None,
+            api_key: None,
+            model: None,
+        },
     }
 }

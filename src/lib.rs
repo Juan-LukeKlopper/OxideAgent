@@ -11,4 +11,4 @@ pub mod interfaces;
 pub mod types;
 
 // Re-export main items for easier access
-pub use config::Config;
+pub use config::OxideConfig as Config;

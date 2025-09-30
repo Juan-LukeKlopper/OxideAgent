@@ -3,7 +3,7 @@
 // We can't directly import from the test utilities in integration tests
 // So we'll just test the functionality that doesn't require the mock objects
 
-use OxideAgent::config::{AgentConfig, AgentType, Config, InterfaceType};
+use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
 use OxideAgent::core::tools::{Tool, ToolProfile};
 use serde_json::json;
 
@@ -115,9 +115,18 @@ fn test_create_test_config() {
         no_stream: false,
         session: Some("test_session".to_string()),
         list_sessions: false,
-        mcp_server: None,
-        mcp_auth_token: None,
         interface: InterfaceType::Tui,
+        mcp: OxideAgent::config::MCPConfig {
+            server: None,
+            auth_token: None,
+            tools: vec![],
+        },
+        llm: OxideAgent::config::LLMConfig {
+            provider: "ollama".to_string(),
+            api_base: None,
+            api_key: None,
+            model: None,
+        },
     };
 
     assert_eq!(config.agent.name, "Qwen");

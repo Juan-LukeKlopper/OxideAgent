@@ -1,6 +1,6 @@
 //! Integration tests for tool execution workflows.
 
-use OxideAgent::config::{AgentConfig, AgentType, Config, InterfaceType};
+use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
 use OxideAgent::core::container::Container;
 use OxideAgent::core::tools::{
     ReadFileTool, RunShellCommandTool, Tool, ToolRegistry, WriteFileTool,
@@ -23,9 +23,18 @@ async fn test_tool_execution_workflow() {
         no_stream: true,
         session: Some("tool_test_session".to_string()),
         list_sessions: false,
-        mcp_server: None,
-        mcp_auth_token: None,
         interface: InterfaceType::Tui,
+        mcp: OxideAgent::config::MCPConfig {
+            server: None,
+            auth_token: None,
+            tools: vec![],
+        },
+        llm: OxideAgent::config::LLMConfig {
+            provider: "ollama".to_string(),
+            api_base: None,
+            api_key: None,
+            model: None,
+        },
     };
 
     // Create channels for communication
