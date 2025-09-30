@@ -1,4 +1,4 @@
-name: Rust CI
+name: Pull Request CI
 
 on:
   pull_request:
@@ -8,7 +8,7 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - 'tests/**'
-      - '.github/workflows/rust_ci.yml'
+      - '.github/workflows/pull_request_ci.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,13 +41,7 @@ jobs:
       env:
         RUST_BACKTRACE: 1
 
-    - name: Check formatting
-      run: |
-        cargo fmt --all -- --check
 
-    - name: Clippy
-      run: |
-        cargo clippy -- -D warnings
 
   cross-platform-test:
     runs-on: ${{ matrix.os }}
@@ -80,13 +74,21 @@ jobs:
       env:
         RUST_BACKTRACE: 1
 
-  security-audit:
+  linting_formatting_and_security_checks:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
+
+    - name: Check formatting
+      run: |
+        cargo fmt --all -- --check
+
+    - name: Clippy
+      run: |
+        cargo clippy -- -D warnings
       
     - name: Install cargo-deny
       run: |

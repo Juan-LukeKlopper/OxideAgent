@@ -1,4 +1,4 @@
-name: Rust CI - Comprehensive
+name: Rust CI
 
 on:
   push:
@@ -114,4 +114,4 @@ jobs:
 
     - name: Run cargo tarpaulin
       run: |
-        cargo tarpaulin --skip-clean --verbose
+        cargo tarpaulin --skip-clean --verbose -- --test-threads 1
