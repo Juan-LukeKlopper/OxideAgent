@@ -5,6 +5,7 @@ use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
 use tokio::sync::mpsc;
+use tracing::info;
 
 pub struct Orchestrator {
     agent: Agent,
@@ -403,7 +404,7 @@ impl Orchestrator {
 
     async fn execute_tool(&self, tool_call: &ToolCall) -> anyhow::Result<String> {
         if let Some(tool) = self.tool_registry.get_tool(&tool_call.function.name) {
-            tool.execute(&tool_call.function.arguments)
+            tool.execute(&tool_call.function.arguments).await
         } else {
             let error_msg = format!("Unknown tool: {}", tool_call.function.name);
             self.tx.send(AppEvent::Error(error_msg.clone())).await?;

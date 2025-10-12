@@ -12,19 +12,25 @@ pub enum ToolProfile {
     Generic,
 }
 
+use async_trait::async_trait;
+
 // The main trait for any tool that can be executed by the agent.
+#[async_trait]
 #[allow(dead_code)] // Trait methods are part of the public API
 pub trait Tool: Send + Sync {
     fn name(&self) -> String;
     fn description(&self) -> String;
     fn parameters(&self) -> Value;
     fn profile(&self) -> ToolProfile;
-    fn execute(&self, args: &Value) -> anyhow::Result<String>;
+    async fn execute(&self, args: &Value) -> anyhow::Result<String>;
 
     // Provides the full tool definition for the Ollama API.
     fn definition(&self) -> ApiTool {
         ApiTool::new(&self.name(), &self.description(), self.parameters())
     }
+    
+    // Method to clone the tool as a boxed trait object
+    fn clone_box(&self) -> Box<dyn Tool>;
 }
 
 // A registry to hold all available tools.
@@ -63,10 +69,13 @@ impl ToolRegistry {
 
     // Clone method that creates a new registry with the same tool definitions
     pub fn clone_registry(&self) -> Self {
-        // Since tools are stateless, we can recreate the registry with the same tools
-        // In a real implementation, we'd need to register the tools again
-        // For now, we'll return an empty registry and let the caller register the tools
-        ToolRegistry::new()
+        // Create a new registry with cloned tools
+        let mut new_registry = ToolRegistry::new();
+        // Clone all tools using their clone_box method
+        for tool in &self.tools {
+            new_registry.tools.push(tool.clone_box());
+        }
+        new_registry
     }
 }
 
@@ -79,6 +88,7 @@ impl Default for ToolRegistry {
 // Tool for writing content to a file.
 pub struct WriteFileTool;
 
+#[async_trait]
 impl Tool for WriteFileTool {
     fn name(&self) -> String {
         "write_file".to_string()
@@ -109,7 +119,7 @@ impl Tool for WriteFileTool {
         ToolProfile::File
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let path = args["path"].as_str().unwrap_or("");
         let content = args["content"].as_str().unwrap_or("");
         if path.is_empty() {
@@ -118,11 +128,16 @@ impl Tool for WriteFileTool {
         fs::write(path, content)?;
         Ok(format!("File '{}' written successfully.", path))
     }
+    
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(WriteFileTool)
+    }
 }
 
 // Tool for reading content from a file.
 pub struct ReadFileTool;
 
+#[async_trait]
 impl Tool for ReadFileTool {
     fn name(&self) -> String {
         "read_file".to_string()
@@ -149,7 +164,7 @@ impl Tool for ReadFileTool {
         ToolProfile::File
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let path = args["path"].as_str().unwrap_or("");
         if path.is_empty() {
             return Err(anyhow::anyhow!("'path' argument is required"));
@@ -157,11 +172,16 @@ impl Tool for ReadFileTool {
         let content = fs::read_to_string(path)?;
         Ok(content)
     }
+    
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(ReadFileTool)
+    }
 }
 
 // Tool for running a shell command.
 pub struct RunShellCommandTool;
 
+#[async_trait]
 impl Tool for RunShellCommandTool {
     fn name(&self) -> String {
         "run_shell_command".to_string()
@@ -188,7 +208,7 @@ impl Tool for RunShellCommandTool {
         ToolProfile::Shell
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let command = args["command"].as_str().unwrap_or("");
         if command.is_empty() {
             return Err(anyhow::anyhow!("'command' argument is required"));
@@ -200,5 +220,9 @@ impl Tool for RunShellCommandTool {
             anyhow::bail!("Command failed: {}. Stderr: {}", result, error);
         }
         Ok(result)
+    }
+    
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(RunShellCommandTool)
     }
 }

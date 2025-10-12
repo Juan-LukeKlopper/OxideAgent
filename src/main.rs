@@ -80,7 +80,9 @@ async fn main() -> anyhow::Result<()> {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Build the orchestrator using the container
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx)?;
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await?;
 
     // Load the previous session state if it exists
     orchestrator.load_state()?;
@@ -100,7 +102,7 @@ async fn main() -> anyhow::Result<()> {
         &container.config().interface,
         interface_rx,
         interface_tx,
-        session_name,
+        session_name.clone(), // Clone to keep original for logging
         session_history,
     )?;
 
