@@ -64,7 +64,7 @@ impl Tool for MockTool {
             Ok(self.result.clone())
         }
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(MockTool {
             name: self.name.clone(),

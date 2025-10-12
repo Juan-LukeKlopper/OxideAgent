@@ -28,7 +28,7 @@ fn truncate_description(description: &str) -> String {
 pub trait McpConnection: Send + Sync {
     /// Discover available tools from the MCP server
     async fn discover_tools(&mut self) -> Result<Vec<McpToolDefinition>>;
-    
+
     /// Execute a tool on the MCP server
     async fn execute_tool(&mut self, tool_name: &str, args: &Value) -> Result<Value>;
 }
@@ -319,7 +319,7 @@ impl StdioMcpConnection {
 #[async_trait::async_trait]
 impl McpConnection for StdioMcpConnection {
     async fn discover_tools(&mut self) -> Result<Vec<McpToolDefinition>> {
-        self.discover_tools().await  // Call the public method
+        self.discover_tools().await // Call the public method
     }
 
     async fn execute_tool(&mut self, tool_name: &str, args: &Value) -> Result<Value> {
@@ -385,7 +385,7 @@ impl Tool for StdioMcpToolAdapter {
             self.name
         ))
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(StdioMcpToolAdapter {
             name: self.name.clone(),
@@ -510,7 +510,7 @@ mod tests {
     #[tokio::test]
     async fn test_mcp_connection_trait_implementation() {
         use async_trait::async_trait;
-        
+
         struct MockConnection {
             counter: u32,
         }
@@ -559,11 +559,11 @@ mod tests {
         assert_eq!(cloned_adapter.name(), "test_tool");
         assert_eq!(cloned_adapter.description(), "A test tool");
     }
-    
+
     #[tokio::test]
     async fn test_stdio_mcp_connection_creation_with_non_command_type() {
         use crate::core::mcp::config::McpServerType;
-        
+
         let config = McpServerConfig {
             name: "test".to_string(),
             description: Some("test".to_string()),
@@ -580,21 +580,21 @@ mod tests {
         let result = StdioMcpConnection::new(&config).await;
         assert!(result.is_err());
     }
-    
+
     #[tokio::test]
     async fn test_truncate_description_function() {
         // Test short description
         let short_desc = "This is a short description";
         let result = truncate_description(short_desc);
         assert_eq!(result, short_desc);
-        
+
         // Test long description that should be truncated
         let long_desc = "This is a very long description that definitely exceeds sixty characters and should be truncated with an ellipsis at the end";
         let result = truncate_description(long_desc);
         assert_eq!(result.len(), 63); // 60 + 3 for "..."
         assert!(result.ends_with("..."));
     }
-    
+
     #[tokio::test]
     async fn test_mcp_tool_definition_structure() {
         let tool_def = McpToolDefinition {
@@ -610,12 +610,12 @@ mod tests {
                 "required": ["param1"]
             }),
         };
-        
+
         assert_eq!(tool_def.name, "test_tool");
         assert_eq!(tool_def.description, "A test tool for testing purposes");
         assert!(!tool_def.input_schema.is_null());
     }
-    
+
     #[tokio::test]
     async fn test_json_rpc_structures() {
         // Test JsonRpcRequest
@@ -625,23 +625,23 @@ mod tests {
             method: "test_method".to_string(),
             params: Some(serde_json::json!({"test": "value"})),
         };
-        
+
         assert_eq!(request.jsonrpc, "2.0");
         assert_eq!(request.id, 1);
         assert_eq!(request.method, "test_method");
         assert!(request.params.is_some());
-        
+
         // Test JsonRpcSuccessResponse
         let success_response = JsonRpcSuccessResponse {
             jsonrpc: "2.0".to_string(),
             id: 1,
             result: serde_json::json!("test_result"),
         };
-        
+
         assert_eq!(success_response.jsonrpc, "2.0");
         assert_eq!(success_response.id, 1);
         assert_eq!(success_response.result, serde_json::json!("test_result"));
-        
+
         // Test JsonRpcErrorResponse
         let error_response = JsonRpcErrorResponse {
             jsonrpc: "2.0".to_string(),
@@ -652,28 +652,28 @@ mod tests {
                 data: Some(serde_json::json!({"details": "error details"})),
             },
         };
-        
+
         assert_eq!(error_response.jsonrpc, "2.0");
         assert_eq!(error_response.id, 1);
         assert_eq!(error_response.error.code, -32600);
         assert_eq!(error_response.error.message, "Invalid Request");
         assert!(error_response.error.data.is_some());
-        
+
         // Test ToolsListResult
         let tool_def = McpToolDefinition {
             name: "listed_tool".to_string(),
             description: "A tool in the list".to_string(),
             input_schema: serde_json::json!({}),
         };
-        
+
         let tools_list = ToolsListResult {
             tools: vec![tool_def],
         };
-        
+
         assert_eq!(tools_list.tools.len(), 1);
         assert_eq!(tools_list.tools[0].name, "listed_tool");
     }
-    
+
     // NOTE: The following tests would require launching actual processes
     // which is not feasible in a unit test environment. These methods are
     // extensively tested through integration tests and manual testing.

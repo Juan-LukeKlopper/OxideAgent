@@ -1,0 +1,14 @@
+[agent]
+agent_type = "Qwen"
+model = "qwen3:4b"
+name = "Qwen"
+system_prompt = "You are a Rust programming expert."
+
+[mcp]
+server = "https://mcp.docs.astro.build/mcp"
+auth_token = "dummy-token"
+
+[[mcp.tools]]
+name = "weather"
+command = "npx"
+args = ["-y", "@h1deya/mcp-server-weather"]

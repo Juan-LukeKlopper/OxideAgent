@@ -2,10 +2,10 @@
 
 use crate::core::tools::Tool;
 use crate::types::{AppEvent, ChatMessage, Tool as ApiTool};
+use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
-use async_trait::async_trait;
 
 // Mock for the Ollama API client
 #[allow(dead_code)] // Fields and methods are used in tests
@@ -235,7 +235,7 @@ impl CoreTool for MockWriteFileTool {
             Err(e) => Err(anyhow::anyhow!(e)),
         }
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(MockWriteFileTool {
             mock_file_system: self.mock_file_system.clone(),
@@ -294,7 +294,7 @@ impl CoreTool for MockReadFileTool {
             Err(e) => Err(anyhow::anyhow!(e)),
         }
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(MockReadFileTool {
             mock_file_system: self.mock_file_system.clone(),
@@ -355,7 +355,7 @@ impl CoreTool for MockRunShellCommandTool {
             Err(e) => Err(anyhow::anyhow!(e)),
         }
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(MockRunShellCommandTool {
             mock_shell_executor: self.mock_shell_executor.clone(),

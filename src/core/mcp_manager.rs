@@ -76,7 +76,8 @@ impl McpManager {
                             for mcp_tool in mcp_tools {
                                 info!(
                                     "  - Adding MCP tool adapter: {} - {}",
-                                    mcp_tool.name, truncate_description(&mcp_tool.description)
+                                    mcp_tool.name,
+                                    truncate_description(&mcp_tool.description)
                                 );
 
                                 // Create an adapter for the tool
@@ -125,7 +126,7 @@ impl McpManager {
     pub async fn launch_remote_server(&mut self, config: &MCPConfig) -> Result<()> {
         if let Some(server_url) = &config.server {
             info!("Processing remote MCP server: {}", server_url);
-            
+
             // Create a server config for the remote server
             let server_config = McpServerConfig {
                 name: "remote_mcp_server".to_string(),
@@ -133,7 +134,7 @@ impl McpManager {
                 server_type: McpServerType::Remote {
                     url: server_url.clone(),
                     access_token: config.auth_token.clone(),
-                    api_key: None,  // API key not currently supported in the main config
+                    api_key: None, // API key not currently supported in the main config
                 },
                 auto_start: Some(true),
                 environment: None,
@@ -141,25 +142,38 @@ impl McpManager {
 
             // Handle remote server launch using the new manager's approach
             match &server_config.server_type {
-                McpServerType::Remote { url, access_token, api_key } => {
+                McpServerType::Remote {
+                    url,
+                    access_token,
+                    api_key,
+                } => {
                     // For remote servers, create an HTTP connection
-                    info!("Creating HTTP connection to remote MCP server at URL: {}", url);
-                    
+                    info!(
+                        "Creating HTTP connection to remote MCP server at URL: {}",
+                        url
+                    );
+
                     let http_connection = crate::core::mcp::http::HttpMcpConnection::new(
                         &server_config,
                         url.clone(),
                         access_token.clone(),
                         api_key.clone(),
                     );
-                    
+
                     // Add connection to the registry
                     let connection_id = format!("{}_connection", server_config.name);
-                    self.new_manager.get_registry()
+                    self.new_manager
+                        .get_registry()
                         .add_http_connection(connection_id.clone(), http_connection)
                         .await;
 
                     // Discover tools from the remote server using the registry
-                    match self.new_manager.get_registry().discover_tools_on_connection(&connection_id).await {
+                    match self
+                        .new_manager
+                        .get_registry()
+                        .discover_tools_on_connection(&connection_id)
+                        .await
+                    {
                         Ok(mcp_tools) => {
                             info!(
                                 "Discovered {} tools from HTTP MCP server '{}':",
@@ -171,7 +185,8 @@ impl McpManager {
                             for mcp_tool in mcp_tools {
                                 info!(
                                     "  - Adding MCP tool adapter: {} - {}",
-                                    mcp_tool.name, truncate_description(&mcp_tool.description)
+                                    mcp_tool.name,
+                                    truncate_description(&mcp_tool.description)
                                 );
 
                                 // Create an adapter for the tool

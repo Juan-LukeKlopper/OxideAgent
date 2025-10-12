@@ -11,8 +11,8 @@ use crate::interfaces::tui::Tui;
 use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
 use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
 use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -112,7 +112,6 @@ async fn main() -> anyhow::Result<()> {
     interface.init().await?;
     info!("Interface initialized successfully");
 
-    
     info!("Starting TUI interface for session: {}", session_name);
 
     // Run the interface

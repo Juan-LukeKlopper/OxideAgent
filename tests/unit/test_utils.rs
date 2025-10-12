@@ -40,9 +40,11 @@ async fn test_mock_tool_success() {
                 Ok("Success result".to_string())
             }
         }
-        
+
         fn clone_box(&self) -> Box<dyn Tool> {
-            Box::new(TestTool { should_fail: self.should_fail })
+            Box::new(TestTool {
+                should_fail: self.should_fail,
+            })
         }
     }
 
@@ -87,9 +89,11 @@ async fn test_mock_tool_failure() {
                 Ok("Success result".to_string())
             }
         }
-        
+
         fn clone_box(&self) -> Box<dyn Tool> {
-            Box::new(TestTool { should_fail: self.should_fail })
+            Box::new(TestTool {
+                should_fail: self.should_fail,
+            })
         }
     }
 

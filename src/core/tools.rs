@@ -28,7 +28,7 @@ pub trait Tool: Send + Sync {
     fn definition(&self) -> ApiTool {
         ApiTool::new(&self.name(), &self.description(), self.parameters())
     }
-    
+
     // Method to clone the tool as a boxed trait object
     fn clone_box(&self) -> Box<dyn Tool>;
 }
@@ -128,7 +128,7 @@ impl Tool for WriteFileTool {
         fs::write(path, content)?;
         Ok(format!("File '{}' written successfully.", path))
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(WriteFileTool)
     }
@@ -172,7 +172,7 @@ impl Tool for ReadFileTool {
         let content = fs::read_to_string(path)?;
         Ok(content)
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(ReadFileTool)
     }
@@ -221,7 +221,7 @@ impl Tool for RunShellCommandTool {
         }
         Ok(result)
     }
-    
+
     fn clone_box(&self) -> Box<dyn Tool> {
         Box::new(RunShellCommandTool)
     }
