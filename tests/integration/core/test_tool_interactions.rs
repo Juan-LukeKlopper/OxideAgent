@@ -45,6 +45,7 @@ async fn test_tool_execution_workflow() {
     let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await
         .unwrap();
 
     // Test WriteFileTool directly
@@ -53,7 +54,7 @@ async fn test_tool_execution_workflow() {
         "path": "test_tool_workflow.txt",
         "content": "Hello from tool workflow test!"
     });
-    let write_result = write_tool.execute(&write_args);
+    let write_result = write_tool.execute(&write_args).await;
     assert!(write_result.is_ok());
 
     // Verify the file was created with correct content
@@ -66,7 +67,7 @@ async fn test_tool_execution_workflow() {
     let read_args = json!({
         "path": "test_tool_workflow.txt"
     });
-    let read_result = read_tool.execute(&read_args);
+    let read_result = read_tool.execute(&read_args).await;
     assert!(read_result.is_ok());
     assert_eq!(read_result.unwrap(), "Hello from tool workflow test!");
 
@@ -75,7 +76,7 @@ async fn test_tool_execution_workflow() {
     let shell_args = json!({
         "command": "echo 'Hello from shell tool!'"
     });
-    let shell_result = shell_tool.execute(&shell_args);
+    let shell_result = shell_tool.execute(&shell_args).await;
     assert!(shell_result.is_ok());
     let shell_output = shell_result.unwrap();
     assert!(shell_output.trim() == "Hello from shell tool!");
@@ -125,7 +126,7 @@ async fn test_write_file_tool_functionality() {
         "content": "Test content for functionality test"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
 
     // Verify file was created with correct content
@@ -139,7 +140,7 @@ async fn test_write_file_tool_functionality() {
         "content": "Hello, 世界! 🌍"
     });
 
-    let result = tool.execute(&args_unicode);
+    let result = tool.execute(&args_unicode).await;
     assert!(result.is_ok());
 
     // Verify unicode content
@@ -164,7 +165,7 @@ async fn test_read_file_tool_functionality() {
     let args = json!({
         "path": "test_read_normal.txt"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Normal file content");
 
@@ -172,7 +173,7 @@ async fn test_read_file_tool_functionality() {
     let args = json!({
         "path": "test_read_unicode.txt"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Unicode content: 世界 🌍");
 
@@ -180,7 +181,7 @@ async fn test_read_file_tool_functionality() {
     let args = json!({
         "path": "test_read_empty.txt"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "");
 
@@ -188,7 +189,7 @@ async fn test_read_file_tool_functionality() {
     let args = json!({
         "path": "nonexistent_file.txt"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 
     // Clean up
@@ -205,7 +206,7 @@ async fn test_run_shell_command_tool_functionality() {
     let args = json!({
         "command": "echo 'Hello, World!'"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     let output = result.unwrap();
     assert_eq!(output.trim(), "Hello, World!");
@@ -214,21 +215,21 @@ async fn test_run_shell_command_tool_functionality() {
     let args = json!({
         "command": "ls"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
 
     // Test command that fails
     let args = json!({
         "command": "nonexistent_command_that_does_not_exist"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 
     // Test command with arguments
     let args = json!({
         "command": "printf 'Test %s' 'command'"
     });
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     let output = result.unwrap();
     assert_eq!(output.trim(), "Test command");

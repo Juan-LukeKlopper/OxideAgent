@@ -5,15 +5,17 @@
 
 use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
 use OxideAgent::core::tools::{Tool, ToolProfile};
+use async_trait::async_trait;
 use serde_json::json;
 
-#[test]
-fn test_mock_tool_success() {
+#[tokio::test]
+async fn test_mock_tool_success() {
     // Since we can't import the mock tool directly, we'll create a simple test tool inline
     struct TestTool {
         should_fail: bool,
     }
 
+    #[async_trait]
     impl Tool for TestTool {
         fn name(&self) -> String {
             "test_tool".to_string()
@@ -31,12 +33,16 @@ fn test_mock_tool_success() {
             ToolProfile::Generic
         }
 
-        fn execute(&self, _args: &serde_json::Value) -> anyhow::Result<String> {
+        async fn execute(&self, _args: &serde_json::Value) -> anyhow::Result<String> {
             if self.should_fail {
                 Err(anyhow::anyhow!("Mock tool failed as requested"))
             } else {
                 Ok("Success result".to_string())
             }
+        }
+        
+        fn clone_box(&self) -> Box<dyn Tool> {
+            Box::new(TestTool { should_fail: self.should_fail })
         }
     }
 
@@ -46,16 +52,17 @@ fn test_mock_tool_success() {
     assert_eq!(tool.description(), "A test tool");
     assert_eq!(tool.profile(), ToolProfile::Generic);
 
-    let result = tool.execute(&json!({})).unwrap();
+    let result = tool.execute(&json!({})).await.unwrap();
     assert_eq!(result, "Success result");
 }
 
-#[test]
-fn test_mock_tool_failure() {
+#[tokio::test]
+async fn test_mock_tool_failure() {
     struct TestTool {
         should_fail: bool,
     }
 
+    #[async_trait]
     impl Tool for TestTool {
         fn name(&self) -> String {
             "failing_tool".to_string()
@@ -73,18 +80,22 @@ fn test_mock_tool_failure() {
             ToolProfile::Generic
         }
 
-        fn execute(&self, _args: &serde_json::Value) -> anyhow::Result<String> {
+        async fn execute(&self, _args: &serde_json::Value) -> anyhow::Result<String> {
             if self.should_fail {
                 Err(anyhow::anyhow!("Mock tool failed as requested"))
             } else {
                 Ok("Success result".to_string())
             }
         }
+        
+        fn clone_box(&self) -> Box<dyn Tool> {
+            Box::new(TestTool { should_fail: self.should_fail })
+        }
     }
 
     let tool = TestTool { should_fail: true };
 
-    let result = tool.execute(&json!({}));
+    let result = tool.execute(&json!({})).await;
     assert!(result.is_err());
     assert_eq!(
         result.unwrap_err().to_string(),

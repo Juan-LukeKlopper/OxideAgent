@@ -105,8 +105,8 @@ fn test_tool_definition() {
     assert_eq!(definition.function.parameters, tool.parameters());
 }
 
-#[test]
-fn test_mock_write_file_tool() {
+#[tokio::test]
+async fn test_mock_write_file_tool() {
     let mock_fs = Arc::new(Mutex::new(MockFileSystem::new()));
     let tool = MockWriteFileTool::new(mock_fs.clone());
 
@@ -125,7 +125,7 @@ fn test_mock_write_file_tool() {
         "content": "Hello, World!"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
 
     // Verify file was created with correct content in the mock file system
@@ -133,8 +133,8 @@ fn test_mock_write_file_tool() {
     assert_eq!(fs.read_file("test_write.txt").unwrap(), "Hello, World!");
 }
 
-#[test]
-fn test_mock_write_file_tool_missing_args() {
+#[tokio::test]
+async fn test_mock_write_file_tool_missing_args() {
     let mock_fs = Arc::new(Mutex::new(MockFileSystem::new()));
     let tool = MockWriteFileTool::new(mock_fs);
 
@@ -143,7 +143,7 @@ fn test_mock_write_file_tool_missing_args() {
         "content": "Hello, World!"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 
     // Test with missing content (but existing path)
@@ -151,7 +151,7 @@ fn test_mock_write_file_tool_missing_args() {
         "path": "test_write.txt"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok()); // Content is optional in this implementation
 
     // Test with empty path
@@ -160,12 +160,12 @@ fn test_mock_write_file_tool_missing_args() {
         "content": "Hello, World!"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_mock_read_file_tool() {
+#[tokio::test]
+async fn test_mock_read_file_tool() {
     let mock_fs = Arc::new(Mutex::new(MockFileSystem::new()));
 
     // Pre-populate the mock file system
@@ -190,20 +190,20 @@ fn test_mock_read_file_tool() {
         "path": "test_read.txt"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "Hello, World!");
 }
 
-#[test]
-fn test_mock_read_file_tool_missing_args() {
+#[tokio::test]
+async fn test_mock_read_file_tool_missing_args() {
     let mock_fs = Arc::new(Mutex::new(MockFileSystem::new()));
     let tool = MockReadFileTool::new(mock_fs);
 
     // Test with missing path
     let args = json!({});
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 
     // Test with empty path
@@ -211,12 +211,12 @@ fn test_mock_read_file_tool_missing_args() {
         "path": ""
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_mock_run_shell_command_tool() {
+#[tokio::test]
+async fn test_mock_run_shell_command_tool() {
     let mock_shell = Arc::new(Mutex::new(MockShellExecutor::new()));
     let tool = MockRunShellCommandTool::new(mock_shell);
 
@@ -234,21 +234,21 @@ fn test_mock_run_shell_command_tool() {
         "command": "echo 'Hello, World!'"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("echo 'Hello, World!'"));
 }
 
-#[test]
-fn test_mock_run_shell_command_tool_missing_args() {
+#[tokio::test]
+async fn test_mock_run_shell_command_tool_missing_args() {
     let mock_shell = Arc::new(Mutex::new(MockShellExecutor::new()));
     let tool = MockRunShellCommandTool::new(mock_shell);
 
     // Test with missing command
     let args = json!({});
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 
     // Test with empty command
@@ -256,12 +256,12 @@ fn test_mock_run_shell_command_tool_missing_args() {
         "command": ""
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_mock_run_shell_command_tool_error() {
+#[tokio::test]
+async fn test_mock_run_shell_command_tool_error() {
     let mock_shell = Arc::new(Mutex::new(MockShellExecutor::new()));
 
     // Set up an expected error for a specific command
@@ -277,6 +277,6 @@ fn test_mock_run_shell_command_tool_error() {
         "command": "nonexistent_command"
     });
 
-    let result = tool.execute(&args);
+    let result = tool.execute(&args).await;
     assert!(result.is_err());
 }
