@@ -11,9 +11,22 @@ use crate::interfaces::tui::Tui;
 use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
 use tokio::sync::mpsc;
+use tracing_subscriber::EnvFilter;
+use tracing::info;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize tracing subscriber to write to a file to avoid interfering with TUI
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open("oxideagent.log")?;
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(std::sync::Arc::new(log_file))
+        .init();
+
     let args = cli::Args::parse();
 
     // Load configuration from file if specified, otherwise use default config
@@ -91,14 +104,24 @@ async fn main() -> anyhow::Result<()> {
         session_history,
     )?;
 
+    info!("Interface created successfully");
+
     // Initialize the interface
     interface.init().await?;
+    info!("Interface initialized successfully");
+
+    
+    info!("Starting TUI interface for session: {}", session_name);
 
     // Run the interface
     interface.run().await?;
+    info!("Interface run completed");
+
+    info!("TUI interface ended for session: {}", session_name);
 
     // Cleanup the interface
     interface.cleanup().await?;
+    info!("Interface cleanup completed");
 
     Ok(())
 }
