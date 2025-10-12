@@ -3,6 +3,7 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::json;
 use tokio::sync::mpsc;
+use tracing::{debug, error, info, trace};
 
 pub async fn send_chat(
     client: &Client,
@@ -12,98 +13,241 @@ pub async fn send_chat(
     stream: bool,
     tx: mpsc::Sender<AppEvent>,
 ) -> anyhow::Result<Option<ChatMessage>> {
-    let res = client
+    info!("=== OLLAMA REQUEST START ===");
+    info!("Sending chat request to Ollama model: {}", model);
+    info!("Request streaming: {}", stream);
+    info!("Message history contains {} messages", history.len());
+    info!("Sending {} tools to model:", tools.len());
+
+    for (i, tool) in tools.iter().enumerate() {
+        let description = if tool.function.description.len() > 60 {
+            format!("{}...", &tool.function.description[..60])
+        } else {
+            tool.function.description.clone()
+        };
+        info!(
+            "  {}. Tool: {} - {}",
+            i + 1,
+            tool.function.name,
+            description
+        );
+    }
+
+    // Create the request payload
+    let request_payload = json!({
+        "model": model,
+        "messages": history,
+        "tools": tools,
+        "stream": stream,
+    });
+
+    // Log the full request payload (truncated if too long)
+    let payload_str = serde_json::to_string_pretty(&request_payload)?;
+    if payload_str.len() > 5000 {
+        info!("Full request payload (truncated): {}", &payload_str[..5000]);
+        info!(
+            "... (payload truncated, total length: {} characters)",
+            payload_str.len()
+        );
+    } else {
+        info!("Full request payload:\n{}", payload_str);
+    }
+
+    info!("Making HTTP POST request to: http://localhost:11434/api/chat");
+
+    // Add detailed HTTP request tracing
+    trace!("Sending HTTP request with headers and payload to Ollama API");
+    let response_result = client
         .post("http://localhost:11434/api/chat")
-        .json(&json!({
-            "model": model,
-            "messages": history,
-            "tools": tools,
-            "stream": stream,
-        }))
+        .json(&request_payload)
         .send()
-        .await?;
+        .await;
 
-    if stream {
-        let mut content = String::new();
-        let mut tool_calls: Vec<ToolCall> = Vec::new();
-        let mut stream = res.bytes_stream();
-        let mut buffer = String::new();
+    match &response_result {
+        Ok(response) => {
+            trace!(
+                "HTTP request to Ollama succeeded with status: {}",
+                response.status()
+            );
+        }
+        Err(e) => {
+            trace!("HTTP request to Ollama failed with error: {}", e);
+        }
+    }
 
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk?;
-            buffer.push_str(&String::from_utf8_lossy(&chunk));
+    info!("=== OLLAMA REQUEST END ===");
 
-            while let Some(newline_pos) = buffer.find('\n') {
-                let line = buffer.drain(..=newline_pos).collect::<String>();
-                if line.trim().is_empty() {
-                    continue;
-                }
+    match response_result {
+        Ok(response) => {
+            info!("=== OLLAMA RESPONSE START ===");
+            let status = response.status();
+            info!("Received HTTP response with status: {}", status);
 
-                let parsed: serde_json::Value = match serde_json::from_str(line.trim()) {
-                    Ok(p) => p,
-                    Err(e) => {
-                        tx.send(AppEvent::Error(format!(
-                            "Error parsing JSON line: '{}', error: {}",
-                            line, e
-                        )))
-                        .await?;
-                        continue;
-                    }
-                };
+            if stream {
+                info!("Processing streaming response...");
+                let mut content = String::new();
+                let mut tool_calls: Vec<ToolCall> = Vec::new();
+                let mut stream = response.bytes_stream();
+                let mut buffer = String::new();
 
-                if let Some(c) = parsed["message"]["content"].as_str() {
-                    tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
-                    content.push_str(c);
-                }
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(chunk_data) => {
+                            trace!("Received {} bytes from Ollama stream", chunk_data.len());
+                            buffer.push_str(&String::from_utf8_lossy(&chunk_data));
 
-                if let Some(tool_call_array) = parsed["message"]["tool_calls"].as_array() {
-                    for tool_call in tool_call_array {
-                        if let Ok(tc) = serde_json::from_value::<ToolCall>(tool_call.clone()) {
-                            tool_calls.push(tc);
+                            while let Some(newline_pos) = buffer.find('\n') {
+                                let line = buffer.drain(..=newline_pos).collect::<String>();
+                                if line.trim().is_empty() {
+                                    continue;
+                                }
+
+                                debug!("Received streaming line: {}", line.trim());
+
+                                let parsed: serde_json::Value =
+                                    match serde_json::from_str(line.trim()) {
+                                        Ok(p) => p,
+                                        Err(e) => {
+                                            error!(
+                                                "Error parsing JSON line: '{}', error: {}",
+                                                line, e
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                if let Some(c) = parsed["message"]["content"].as_str() {
+                                    debug!("Content chunk: {}", c);
+                                    // Send content chunk to UI
+                                    if tx
+                                        .send(AppEvent::AgentStreamChunk(c.to_string()))
+                                        .await
+                                        .is_err()
+                                    {
+                                        error!("Failed to send stream chunk to UI");
+                                        break;
+                                    }
+                                    content.push_str(c);
+                                }
+
+                                if let Some(tool_call_array) =
+                                    parsed["message"]["tool_calls"].as_array()
+                                {
+                                    debug!(
+                                        "Found {} tool calls in streaming response",
+                                        tool_call_array.len()
+                                    );
+                                    for tool_call in tool_call_array {
+                                        if let Ok(tc) =
+                                            serde_json::from_value::<ToolCall>(tool_call.clone())
+                                        {
+                                            debug!(
+                                                "Tool call: {} with args: {}",
+                                                tc.function.name, tc.function.arguments
+                                            );
+                                            tool_calls.push(tc);
+                                        }
+                                    }
+                                }
+
+                                if parsed["done"].as_bool().unwrap_or(false) {
+                                    info!("Streaming response completed");
+                                    if tx.send(AppEvent::AgentStreamEnd).await.is_err() {
+                                        error!("Failed to send stream end to UI");
+                                    }
+                                    let message = if !tool_calls.is_empty() {
+                                        info!("Response contains {} tool calls", tool_calls.len());
+                                        ChatMessage::tool_call(&content, tool_calls)
+                                    } else {
+                                        ChatMessage::assistant(&content)
+                                    };
+                                    info!("=== OLLAMA RESPONSE END ===");
+                                    return Ok(Some(message));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error reading stream chunk: {}", e);
+                            break;
                         }
                     }
                 }
 
-                if parsed["done"].as_bool().unwrap_or(false) {
-                    tx.send(AppEvent::AgentStreamEnd).await?;
-                    let message = if !tool_calls.is_empty() {
-                        ChatMessage::tool_call(&content, tool_calls)
-                    } else {
-                        ChatMessage::assistant(&content)
-                    };
-                    return Ok(Some(message));
+                if tx.send(AppEvent::AgentStreamEnd).await.is_err() {
+                    error!("Failed to send stream end to UI");
                 }
+
+                let message = if !tool_calls.is_empty() {
+                    info!("Final response contains {} tool calls", tool_calls.len());
+                    ChatMessage::tool_call(&content, tool_calls)
+                } else {
+                    ChatMessage::assistant(&content)
+                };
+                info!("=== OLLAMA RESPONSE END ===");
+                Ok(Some(message))
+            } else {
+                info!("Processing non-streaming response...");
+                // Non-streaming case
+                let json: serde_json::Value = match response.json().await {
+                    Ok(j) => {
+                        info!("Successfully parsed JSON response");
+                        j
+                    }
+                    Err(e) => {
+                        error!("Error parsing JSON response: {}", e);
+                        return Err(e.into());
+                    }
+                };
+
+                debug!(
+                    "Full JSON response: {}",
+                    serde_json::to_string_pretty(&json)?
+                );
+
+                let content = json["message"]["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                info!("Response content length: {} characters", content.len());
+
+                let mut tool_calls: Vec<ToolCall> = Vec::new();
+                if let Some(tool_call_array) = json["message"]["tool_calls"].as_array() {
+                    info!("Found {} tool calls in response", tool_call_array.len());
+                    for (i, tool_call) in tool_call_array.iter().enumerate() {
+                        if let Ok(tc) = serde_json::from_value::<ToolCall>(tool_call.clone()) {
+                            info!(
+                                "  {}. Tool call: {} with args: {}",
+                                i + 1,
+                                tc.function.name,
+                                tc.function.arguments
+                            );
+                            tool_calls.push(tc);
+                        }
+                    }
+                } else {
+                    info!("No tool calls found in response");
+                }
+
+                let message = if !tool_calls.is_empty() {
+                    info!(
+                        "Creating tool call message with {} tool calls",
+                        tool_calls.len()
+                    );
+                    ChatMessage::tool_call(&content, tool_calls)
+                } else {
+                    info!("Creating assistant message");
+                    ChatMessage::assistant(&content)
+                };
+
+                info!("=== OLLAMA RESPONSE END ===");
+                Ok(Some(message))
             }
         }
-        tx.send(AppEvent::AgentStreamEnd).await?;
-        let message = if !tool_calls.is_empty() {
-            ChatMessage::tool_call(&content, tool_calls)
-        } else {
-            ChatMessage::assistant(&content)
-        };
-        Ok(Some(message))
-    } else {
-        // Non-streaming case remains the same
-        let json: serde_json::Value = res.json().await?;
-        let content = json["message"]["content"]
-            .as_str()
-            .unwrap_or("")
-            .to_string();
-
-        let mut tool_calls: Vec<ToolCall> = Vec::new();
-        if let Some(tool_call_array) = json["message"]["tool_calls"].as_array() {
-            for tool_call in tool_call_array {
-                if let Ok(tc) = serde_json::from_value::<ToolCall>(tool_call.clone()) {
-                    tool_calls.push(tc);
-                }
-            }
+        Err(e) => {
+            error!("=== OLLAMA REQUEST FAILED ===");
+            error!("Failed to send request to Ollama: {}", e);
+            error!("=== OLLAMA REQUEST FAILED END ===");
+            Err(e.into())
         }
-
-        let message = if !tool_calls.is_empty() {
-            ChatMessage::tool_call(&content, tool_calls)
-        } else {
-            ChatMessage::assistant(&content)
-        };
-        Ok(Some(message))
     }
 }

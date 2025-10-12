@@ -43,6 +43,7 @@ async fn test_orchestrator_full_interaction_cycle() {
     let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await
         .unwrap();
 
     // Send a user message
@@ -92,6 +93,7 @@ async fn test_orchestrator_session_switching() {
     let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await
         .unwrap();
 
     // Verify initial session
@@ -152,6 +154,7 @@ async fn test_orchestrator_tool_approvals() {
     let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await
         .unwrap();
 
     // Test loading the state

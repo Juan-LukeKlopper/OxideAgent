@@ -5,6 +5,7 @@
 
 use crate::config::OxideConfig;
 use crate::core::agents::Agent;
+use crate::core::mcp_manager::McpManager;
 use crate::core::orchestrator::Orchestrator;
 use crate::core::session::SessionManager;
 use crate::core::tools::ToolRegistry;
@@ -54,7 +55,7 @@ impl Container {
     }
 
     /// Build the tool registry
-    pub fn build_tool_registry(&mut self) -> Result<&mut ToolRegistry> {
+    pub async fn build_tool_registry(&mut self) -> Result<&mut ToolRegistry> {
         if self.tool_registry.is_none() {
             let mut tool_registry = ToolRegistry::new();
             // Register tools based on configuration
@@ -63,7 +64,38 @@ impl Container {
             tool_registry.add_tool(Box::new(WriteFileTool));
             tool_registry.add_tool(Box::new(ReadFileTool));
             tool_registry.add_tool(Box::new(RunShellCommandTool));
-            self.tool_registry = Some(tool_registry);
+
+            // Log MCP configuration if present
+            if !self.config.mcp.tools.is_empty() {
+                use tracing::info;
+                info!(
+                    "MCP configuration found with {} tool(s)",
+                    self.config.mcp.tools.len()
+                );
+                for tool in &self.config.mcp.tools {
+                    info!("  - MCP Tool: {} (command: {})", tool.name, tool.command);
+                }
+            } else {
+                use tracing::debug;
+                debug!("No MCP tools configured");
+            }
+
+            let mut mcp_manager = McpManager::new(tool_registry);
+            mcp_manager.launch_servers(&self.config.mcp.tools).await?;
+            mcp_manager.launch_remote_server(&self.config.mcp).await?;
+            self.tool_registry = Some(mcp_manager.into_tool_registry());
+
+            // Log the final tools in the registry
+            let final_tools = self.tool_registry.as_ref().unwrap().definitions();
+            use tracing::info;
+            info!("Final tool registry contains {} tools:", final_tools.len());
+            for tool in &final_tools {
+                info!(
+                    "  - Registered tool: {} - {}",
+                    tool.function.name,
+                    tool.truncated_description()
+                );
+            }
         }
         Ok(self.tool_registry.as_mut().unwrap())
     }
@@ -79,7 +111,7 @@ impl Container {
     }
 
     /// Build the orchestrator
-    pub fn build_orchestrator(
+    pub async fn build_orchestrator(
         &mut self,
         orchestrator_tx: mpsc::Sender<AppEvent>,
         orchestrator_rx: mpsc::Receiver<AppEvent>,
@@ -92,22 +124,14 @@ impl Container {
 
         // Build dependencies (we call these to ensure they're initialized)
         let _agent = self.build_agent()?;
-        let _tool_registry = self.build_tool_registry()?;
+        let tool_registry = self.build_tool_registry().await?;
 
         // Create new instance for the orchestrator with the same configuration
         let agent_instance = Agent::new(&agent_name, &agent_model);
 
-        // Create a new tool registry with the same tools
-        let mut new_tool_registry = ToolRegistry::new();
-        // Register the same tools
-        use crate::core::tools::{ReadFileTool, RunShellCommandTool, WriteFileTool};
-        new_tool_registry.add_tool(Box::new(WriteFileTool));
-        new_tool_registry.add_tool(Box::new(ReadFileTool));
-        new_tool_registry.add_tool(Box::new(RunShellCommandTool));
-
         Ok(Orchestrator::new(
             agent_instance,
-            new_tool_registry,
+            tool_registry.clone_registry(),
             session_name,
             no_stream,
             orchestrator_tx,

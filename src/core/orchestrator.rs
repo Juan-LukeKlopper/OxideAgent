@@ -5,6 +5,7 @@ use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
 use tokio::sync::mpsc;
+use tracing::info;
 
 pub struct Orchestrator {
     agent: Agent,
@@ -297,6 +298,23 @@ impl Orchestrator {
     async fn chat_with_agent(&mut self) -> anyhow::Result<()> {
         // Removed the loop since it only iterates once
         let tool_definitions = self.tool_registry.definitions();
+
+        // Log the tools being sent for debugging
+        info!("=== ORCHESTRATOR CHAT REQUEST START ===");
+        info!(
+            "Preparing to send chat request with {} tools",
+            tool_definitions.len()
+        );
+        for (i, tool) in tool_definitions.iter().enumerate() {
+            info!(
+                "  {}. Tool: {} - {}",
+                i + 1,
+                tool.function.name,
+                tool.truncated_description()
+            );
+        }
+
+        info!("Sending chat request to agent...");
         let response = self
             .agent
             .chat(
@@ -307,26 +325,45 @@ impl Orchestrator {
             )
             .await?;
 
+        info!("=== ORCHESTRATOR CHAT REQUEST END ===");
+
         if let Some(response) = response {
             if let Some(tool_calls) = &response.tool_calls {
+                info!("=== ORCHESTRATOR RECEIVED TOOL CALLS ===");
+                info!("Received {} tool calls from agent", tool_calls.len());
+
                 // Check if all tools are already approved
                 let all_approved = tool_calls.iter().all(|tool_call| {
                     // Check global permissions first
                     if self.global_permissions.is_allowed(&tool_call.function.name) {
+                        info!("Tool '{}' is globally approved", tool_call.function.name);
                         return true;
                     }
                     // Check session permissions
                     if self.session_state.is_tool_allowed(&tool_call.function.name) {
+                        info!("Tool '{}' is session approved", tool_call.function.name);
                         return true;
                     }
+                    info!("Tool '{}' requires approval", tool_call.function.name);
                     // Not approved
                     false
                 });
 
                 if all_approved {
+                    info!("All tool calls are approved, executing automatically...");
                     // Execute all tools without approval
-                    for tool_call in tool_calls {
+                    for (i, tool_call) in tool_calls.iter().enumerate() {
+                        info!(
+                            "Executing tool call {}: {} with args: {}",
+                            i + 1,
+                            tool_call.function.name,
+                            tool_call.function.arguments
+                        );
                         let tool_output = self.execute_tool(tool_call).await?;
+                        info!(
+                            "Tool '{}' completed with output: {}",
+                            tool_call.function.name, tool_output
+                        );
                         self.tx
                             .send(AppEvent::ToolResult(
                                 tool_call.function.name.clone(),
@@ -340,14 +377,20 @@ impl Orchestrator {
                     }
                     self.save_state()?;
                 } else {
-                    // Request approval
+                    info!("Some tool calls require approval, requesting user approval...");
+                    // Send tool calls for approval
                     self.tx
                         .send(AppEvent::ToolRequest(tool_calls.clone()))
                         .await?;
                     self.pending_tool_calls = Some(tool_calls.clone());
                 }
+                info!("=== ORCHESTRATOR TOOL CALL PROCESSING END ===");
             } else if self.no_stream {
                 // For non-streaming responses, we need to send AgentMessage to display the content
+                info!(
+                    "Non-streaming response received, sending to UI: {} chars",
+                    response.content.len()
+                );
                 self.tx
                     .send(AppEvent::AgentMessage(response.content.clone()))
                     .await?;
@@ -361,7 +404,7 @@ impl Orchestrator {
 
     async fn execute_tool(&self, tool_call: &ToolCall) -> anyhow::Result<String> {
         if let Some(tool) = self.tool_registry.get_tool(&tool_call.function.name) {
-            tool.execute(&tool_call.function.arguments)
+            tool.execute(&tool_call.function.arguments).await
         } else {
             let error_msg = format!("Unknown tool: {}", tool_call.function.name);
             self.tx.send(AppEvent::Error(error_msg.clone())).await?;

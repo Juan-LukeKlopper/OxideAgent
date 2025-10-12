@@ -107,4 +107,13 @@ impl Tool {
             },
         }
     }
+
+    /// Truncate the tool description to the first 60 characters with an ellipsis if needed
+    pub fn truncated_description(&self) -> String {
+        if self.function.description.len() > 60 {
+            format!("{}...", &self.function.description[..60])
+        } else {
+            self.function.description.clone()
+        }
+    }
 }

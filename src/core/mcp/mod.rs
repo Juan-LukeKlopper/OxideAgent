@@ -4,3 +4,7 @@
 //! both remote and local, with support for various deployment methods.
 
 pub mod config;
+pub mod connection;
+pub mod http;
+pub mod launcher;
+pub mod manager;

@@ -1,6 +1,8 @@
 //! Mock objects for testing external dependencies.
 
+use crate::core::tools::Tool;
 use crate::types::{AppEvent, ChatMessage, Tool as ApiTool};
+use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -189,6 +191,7 @@ impl MockWriteFileTool {
     }
 }
 
+#[async_trait]
 impl CoreTool for MockWriteFileTool {
     fn name(&self) -> String {
         "write_file".to_string()
@@ -219,7 +222,7 @@ impl CoreTool for MockWriteFileTool {
         ToolProfile::File
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let path = args["path"].as_str().unwrap_or("");
         let content = args["content"].as_str().unwrap_or("");
         if path.is_empty() {
@@ -231,6 +234,12 @@ impl CoreTool for MockWriteFileTool {
             Ok(()) => Ok(format!("File '{}' written successfully.", path)),
             Err(e) => Err(anyhow::anyhow!(e)),
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(MockWriteFileTool {
+            mock_file_system: self.mock_file_system.clone(),
+        })
     }
 }
 
@@ -246,6 +255,7 @@ impl MockReadFileTool {
     }
 }
 
+#[async_trait]
 impl CoreTool for MockReadFileTool {
     fn name(&self) -> String {
         "read_file".to_string()
@@ -272,7 +282,7 @@ impl CoreTool for MockReadFileTool {
         ToolProfile::File
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let path = args["path"].as_str().unwrap_or("");
         if path.is_empty() {
             return Err(anyhow::anyhow!("'path' argument is required"));
@@ -283,6 +293,12 @@ impl CoreTool for MockReadFileTool {
             Ok(content) => Ok(content),
             Err(e) => Err(anyhow::anyhow!(e)),
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(MockReadFileTool {
+            mock_file_system: self.mock_file_system.clone(),
+        })
     }
 }
 
@@ -300,6 +316,7 @@ impl MockRunShellCommandTool {
     }
 }
 
+#[async_trait]
 impl CoreTool for MockRunShellCommandTool {
     fn name(&self) -> String {
         "run_shell_command".to_string()
@@ -326,7 +343,7 @@ impl CoreTool for MockRunShellCommandTool {
         ToolProfile::Shell
     }
 
-    fn execute(&self, args: &Value) -> anyhow::Result<String> {
+    async fn execute(&self, args: &Value) -> anyhow::Result<String> {
         let command = args["command"].as_str().unwrap_or("");
         if command.is_empty() {
             return Err(anyhow::anyhow!("'command' argument is required"));
@@ -337,6 +354,12 @@ impl CoreTool for MockRunShellCommandTool {
             Ok(output) => Ok(output),
             Err(e) => Err(anyhow::anyhow!(e)),
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(MockRunShellCommandTool {
+            mock_shell_executor: self.mock_shell_executor.clone(),
+        })
     }
 }
 
@@ -423,8 +446,8 @@ mod tests {
         assert_eq!(client.call_count, 1);
     }
 
-    #[test]
-    fn test_mock_write_file_tool() {
+    #[tokio::test]
+    async fn test_mock_write_file_tool() {
         let mock_fs = std::sync::Arc::new(std::sync::Mutex::new(MockFileSystem::new()));
         let tool = MockWriteFileTool::new(mock_fs.clone());
 
@@ -439,7 +462,7 @@ mod tests {
             "content": "Hello, mock!"
         });
 
-        let result = tool.execute(&args);
+        let result = tool.execute(&args).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "File 'test.txt' written successfully.");
 
@@ -448,8 +471,8 @@ mod tests {
         assert_eq!(fs.read_file("test.txt").unwrap(), "Hello, mock!");
     }
 
-    #[test]
-    fn test_mock_read_file_tool() {
+    #[tokio::test]
+    async fn test_mock_read_file_tool() {
         let mock_fs = std::sync::Arc::new(std::sync::Mutex::new(MockFileSystem::new()));
 
         // Pre-populate the mock file system
@@ -470,13 +493,13 @@ mod tests {
             "path": "test.txt"
         });
 
-        let result = tool.execute(&args);
+        let result = tool.execute(&args).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Hello, mock!");
     }
 
-    #[test]
-    fn test_mock_run_shell_command_tool() {
+    #[tokio::test]
+    async fn test_mock_run_shell_command_tool() {
         let mock_shell = std::sync::Arc::new(std::sync::Mutex::new(MockShellExecutor::new()));
         let tool = MockRunShellCommandTool::new(mock_shell);
 
@@ -490,7 +513,7 @@ mod tests {
             "command": "echo hello"
         });
 
-        let result = tool.execute(&args);
+        let result = tool.execute(&args).await;
         assert!(result.is_ok());
         assert!(result.unwrap().contains("echo hello"));
     }

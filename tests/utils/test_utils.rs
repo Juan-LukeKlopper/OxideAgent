@@ -39,6 +39,7 @@ impl MockTool {
     }
 }
 
+#[async_trait]
 impl Tool for MockTool {
     fn name(&self) -> String {
         self.name.clone()
@@ -56,12 +57,23 @@ impl Tool for MockTool {
         self.profile
     }
 
-    fn execute(&self, _args: &Value) -> Result<String> {
+    async fn execute(&self, _args: &Value) -> Result<String> {
         if self.should_fail {
             Err(anyhow::anyhow!("Mock tool failed as requested"))
         } else {
             Ok(self.result.clone())
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn Tool> {
+        Box::new(MockTool {
+            name: self.name.clone(),
+            description: self.description.clone(),
+            parameters: self.parameters.clone(),
+            profile: self.profile,
+            should_fail: self.should_fail,
+            result: self.result.clone(),
+        })
     }
 }
 

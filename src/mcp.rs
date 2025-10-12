@@ -16,7 +16,8 @@ pub struct McpToolDefinition {
     /// Description of what the tool does
     pub description: String,
     /// JSON schema for the tool's parameters
-    pub parameters: Value,
+    #[serde(rename = "inputSchema", default)]
+    pub input_schema: Value,
 }
 
 /// Adapter that wraps an MCP tool definition to implement the Tool trait
@@ -51,7 +52,8 @@ impl Tool for McpToolAdapter {
     }
     
     fn parameters(&self) -> Value {
-        self.definition.parameters.clone()
+        // Map the input_schema to the parameters format expected by Ollama
+        self.definition.input_schema.clone()
     }
     
     fn profile(&self) -> ToolProfile {
@@ -87,7 +89,7 @@ impl McpConnection {
         }
     }
 
-    /// Discover available tools from the MCP server
+    /// Discover available tools from the MCP server (for the legacy HTTP approach)
     pub async fn discover_tools(&self) -> anyhow::Result<Vec<McpToolDefinition>> {
         let mut request = self.client.get(&format!("{}/tools", self.url));
         if let Some(token) = &self.auth_token {

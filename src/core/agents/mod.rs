@@ -4,6 +4,7 @@ use crate::{
 };
 use reqwest::Client;
 use tokio::sync::mpsc;
+use tracing::info;
 
 #[derive(Debug, Clone)] // Added Debug and Clone for AgentId
 pub enum AgentId {
@@ -51,11 +52,27 @@ impl Agent {
         stream: bool,
         tx: mpsc::Sender<AppEvent>,
     ) -> anyhow::Result<Option<ChatMessage>> {
+        info!("=== AGENT CHAT START ===");
+        info!("Agent model: {}", self.model);
+        info!("History contains {} messages", self.history.len());
+        info!("Sending {} tools to Ollama", tools.len());
+        for (i, tool) in tools.iter().enumerate() {
+            info!(
+                "  {}. Tool: {} - {}",
+                i + 1,
+                tool.function.name,
+                tool.truncated_description()
+            );
+        }
+        info!("Streaming: {}", stream);
+
         let response = send_chat(client, &self.model, &self.history, tools, stream, tx).await?;
 
         if let Some(message) = response.clone() {
             self.add_assistant_message(message.clone());
         }
+
+        info!("=== AGENT CHAT END ===");
 
         Ok(response)
     }

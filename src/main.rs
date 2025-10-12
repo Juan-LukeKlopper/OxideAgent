@@ -11,9 +11,22 @@ use crate::interfaces::tui::Tui;
 use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
 use tokio::sync::mpsc;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Initialize tracing subscriber to write to a file to avoid interfering with TUI
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open("oxideagent.log")?;
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(std::sync::Arc::new(log_file))
+        .init();
+
     let args = cli::Args::parse();
 
     // Load configuration from file if specified, otherwise use default config
@@ -67,7 +80,9 @@ async fn main() -> anyhow::Result<()> {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Build the orchestrator using the container
-    let mut orchestrator = container.build_orchestrator(orchestrator_tx, orchestrator_rx)?;
+    let mut orchestrator = container
+        .build_orchestrator(orchestrator_tx, orchestrator_rx)
+        .await?;
 
     // Load the previous session state if it exists
     orchestrator.load_state()?;
@@ -87,18 +102,27 @@ async fn main() -> anyhow::Result<()> {
         &container.config().interface,
         interface_rx,
         interface_tx,
-        session_name,
+        session_name.clone(), // Clone to keep original for logging
         session_history,
     )?;
 
+    info!("Interface created successfully");
+
     // Initialize the interface
     interface.init().await?;
+    info!("Interface initialized successfully");
+
+    info!("Starting TUI interface for session: {}", session_name);
 
     // Run the interface
     interface.run().await?;
+    info!("Interface run completed");
+
+    info!("TUI interface ended for session: {}", session_name);
 
     // Cleanup the interface
     interface.cleanup().await?;
+    info!("Interface cleanup completed");
 
     Ok(())
 }

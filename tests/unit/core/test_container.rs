@@ -27,12 +27,12 @@ fn test_container_build_agent() {
     assert_eq!(agent.model, "qwen3:4b");
 }
 
-#[test]
-fn test_container_build_tool_registry() {
+#[tokio::test]
+async fn test_container_build_tool_registry() {
     let config = create_test_config();
     let mut container = Container::new(config);
 
-    let tool_registry = container.build_tool_registry();
+    let tool_registry = container.build_tool_registry().await;
     assert!(tool_registry.is_ok());
 
     let tool_registry = tool_registry.unwrap();
@@ -66,7 +66,7 @@ async fn test_container_build_orchestrator() {
 
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
 
-    let orchestrator = container.build_orchestrator(tx, rx);
+    let orchestrator = container.build_orchestrator(tx, rx).await;
     assert!(orchestrator.is_ok());
 
     // We can't access private fields directly, so we just verify the orchestrator was created
@@ -86,8 +86,8 @@ fn test_container_config_accessors() {
     assert_eq!(config_ref.agent.name, "Qwen");
 }
 
-#[test]
-fn test_container_multiple_build_calls() {
+#[tokio::test]
+async fn test_container_multiple_build_calls() {
     let config = create_test_config();
     let mut container = Container::new(config);
 
@@ -98,10 +98,10 @@ fn test_container_multiple_build_calls() {
     let agent2 = container.build_agent();
     assert!(agent2.is_ok());
 
-    let tool_registry1 = container.build_tool_registry();
+    let tool_registry1 = container.build_tool_registry().await;
     assert!(tool_registry1.is_ok());
 
-    let tool_registry2 = container.build_tool_registry();
+    let tool_registry2 = container.build_tool_registry().await;
     assert!(tool_registry2.is_ok());
 }
 
