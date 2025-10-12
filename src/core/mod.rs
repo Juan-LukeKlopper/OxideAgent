@@ -6,6 +6,7 @@ pub mod events;
 pub mod interface;
 pub mod llm;
 pub mod mcp;
+pub mod mcp_manager;
 pub mod mocks;
 pub mod orchestrator;
 pub mod session;
