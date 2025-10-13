@@ -1,6 +1,6 @@
 # OxideAgent
 
-[![CI](https://github.com/Juan-LukeKlopper/OxideAgent/workflows/CI/badge.svg)](https://github.com/Juan-LukeKlopper/OxideAgent/actions)
+[![Rust CI](https://github.com/Juan-LukeKlopper/OxideAgent/workflows/Rust%20CI/badge.svg)](https://github.com/Juan-LukeKlopper/OxideAgent/actions)
 
 A local-first, feature-rich AI agent written in Rust that runs on your machine and connects to Ollama.
 
