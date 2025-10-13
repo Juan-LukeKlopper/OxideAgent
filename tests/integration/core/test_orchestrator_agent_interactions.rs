@@ -9,6 +9,7 @@ use std::fs;
 use tokio::sync::mpsc;
 
 #[tokio::test]
+#[allow(unused_variables, unused_mut)]
 async fn test_orchestrator_full_interaction_cycle() {
     let config = Config {
         agent: AgentConfig {
@@ -55,7 +56,6 @@ async fn test_orchestrator_full_interaction_cycle() {
 
     // Check that the orchestrator has processed the input
     // This test mainly checks that the orchestrator doesn't crash during basic interaction
-    assert!(true); // Placeholder assertion
 }
 
 #[tokio::test]
@@ -105,7 +105,6 @@ async fn test_orchestrator_session_switching() {
 
     // Check that the orchestrator can handle the session change
     // This test mainly checks that the switch_session method doesn't crash
-    assert!(true); // Placeholder assertion
 
     // Clean up session files
     let _ = fs::remove_file("session_initial_session.json");
@@ -113,6 +112,7 @@ async fn test_orchestrator_session_switching() {
 }
 
 #[tokio::test]
+#[allow(unused_variables, unused_mut)]
 async fn test_orchestrator_tool_approvals() {
     // Create a temporary session to avoid conflicts with other tests
     let temp_session_name = "temp_tool_approval_test";

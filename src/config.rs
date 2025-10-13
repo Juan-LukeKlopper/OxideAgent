@@ -313,7 +313,7 @@ llm:
         assert_eq!(config.agent.model, "llama3.2");
         assert_eq!(config.agent.name, "Llama");
         assert_eq!(config.agent.system_prompt, "You are a helpful assistant.");
-        assert_eq!(config.no_stream, true);
+        assert!(config.no_stream);
         assert_eq!(config.session, Some("test-session".to_string()));
         assert_eq!(config.interface, InterfaceType::Tui);
     }
@@ -353,7 +353,7 @@ model = "gpt-4"
         assert_eq!(config.agent.agent_type, AgentType::Granite);
         assert_eq!(config.agent.model, "smolLM2");
         assert_eq!(config.agent.name, "Granite");
-        assert_eq!(config.no_stream, true);
+        assert!(config.no_stream);
         assert_eq!(config.session, Some("toml-session".to_string()));
         assert_eq!(config.mcp.server, Some("http://localhost:8080".to_string()));
         assert_eq!(config.mcp.auth_token, Some("secret-token".to_string()));

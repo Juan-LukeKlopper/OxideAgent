@@ -69,7 +69,6 @@ async fn test_container_build_orchestrator() {
     assert!(orchestrator.is_ok());
 
     // We can't access private fields directly, so we just verify the orchestrator was created
-    assert!(true);
 }
 
 #[test]
