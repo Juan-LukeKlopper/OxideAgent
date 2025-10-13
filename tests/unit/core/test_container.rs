@@ -2,7 +2,6 @@
 
 use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
 use OxideAgent::core::container::Container;
-use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
 use tokio::sync::mpsc;
 

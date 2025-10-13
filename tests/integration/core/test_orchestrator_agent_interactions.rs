@@ -4,8 +4,7 @@ use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as C
 use OxideAgent::core::container::Container;
 use OxideAgent::core::session::SessionState;
 use OxideAgent::core::tool_permissions::GlobalToolPermissions;
-use OxideAgent::core::tools::{ReadFileTool, RunShellCommandTool, ToolRegistry, WriteFileTool};
-use OxideAgent::types::{AppEvent, ChatMessage, ToolApprovalResponse};
+use OxideAgent::types::AppEvent;
 use std::fs;
 use tokio::sync::mpsc;
 

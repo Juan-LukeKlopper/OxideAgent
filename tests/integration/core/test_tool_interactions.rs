@@ -5,7 +5,7 @@ use OxideAgent::core::container::Container;
 use OxideAgent::core::tools::{
     ReadFileTool, RunShellCommandTool, Tool, ToolRegistry, WriteFileTool,
 };
-use OxideAgent::types::{AppEvent, ToolCall, ToolFunction};
+use OxideAgent::types::AppEvent;
 use serde_json::json;
 use std::fs;
 use tokio::sync::mpsc;
