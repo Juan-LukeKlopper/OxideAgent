@@ -3,7 +3,6 @@
 use anyhow::Result;
 use reqwest::Client;
 use serde_json::json;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {

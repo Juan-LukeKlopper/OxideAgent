@@ -436,9 +436,8 @@ mod tests {
         // Verify the streaming events were sent
         let mut received_chunks = Vec::new();
         while let Ok(event) = rx.try_recv() {
-            match event {
-                AppEvent::AgentStreamChunk(chunk) => received_chunks.push(chunk),
-                _ => {}
+            if let AppEvent::AgentStreamChunk(chunk) = event {
+                received_chunks.push(chunk)
             }
         }
 

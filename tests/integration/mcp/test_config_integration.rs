@@ -1,7 +1,6 @@
 //! Integration tests for the MCP configuration functionality.
 
 use OxideAgent::core::mcp::config::{McpConfigFile, McpServerConfig, McpServerType};
-use std::collections::HashMap;
 use std::fs;
 use tempfile::TempDir;
 

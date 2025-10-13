@@ -2,8 +2,6 @@
 
 use OxideAgent::core::agents::{Agent, AgentId};
 use OxideAgent::types::ChatMessage;
-use reqwest::Client;
-use tokio::sync::mpsc;
 
 #[test]
 fn test_agent_new() {

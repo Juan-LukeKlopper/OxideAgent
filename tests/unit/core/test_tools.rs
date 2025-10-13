@@ -4,7 +4,6 @@ use OxideAgent::core::mocks::{
     MockFileSystem, MockReadFileTool, MockRunShellCommandTool, MockShellExecutor, MockWriteFileTool,
 };
 use OxideAgent::core::tools::{Tool, ToolProfile, ToolRegistry};
-use OxideAgent::types::Tool as ApiTool;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 

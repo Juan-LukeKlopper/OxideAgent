@@ -5,12 +5,13 @@ use OxideAgent::core::container::Container;
 use OxideAgent::core::tools::{
     ReadFileTool, RunShellCommandTool, Tool, ToolRegistry, WriteFileTool,
 };
-use OxideAgent::types::{AppEvent, ToolCall, ToolFunction};
+use OxideAgent::types::AppEvent;
 use serde_json::json;
 use std::fs;
 use tokio::sync::mpsc;
 
 #[tokio::test]
+#[allow(unused_variables)]
 async fn test_tool_execution_workflow() {
     // Test full tool execution workflow
     let config = Config {
@@ -38,12 +39,12 @@ async fn test_tool_execution_workflow() {
     };
 
     // Create channels for communication
-    let (orchestrator_tx, mut interface_rx) = mpsc::channel::<AppEvent>(32);
-    let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
+    let (orchestrator_tx, _interface_rx) = mpsc::channel::<AppEvent>(32);
+    let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
     let mut container = Container::new(config);
-    let mut orchestrator = container
+    let orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
         .unwrap();

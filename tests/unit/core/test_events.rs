@@ -41,16 +41,16 @@ fn test_event_with_destination() {
 }
 
 #[test]
+#[allow(unused_variables)]
 fn test_event_bus_creation() {
     let bus = EventBus::new();
-    assert!(true); // Just ensure it creates without error
 }
 
 #[test]
+#[allow(unused_variables)]
 fn test_event_bus_subscribe() {
     let bus = EventBus::new();
     let _subscriber = bus.subscribe();
-    assert!(true); // Just ensure subscription works
 }
 
 #[test]
@@ -66,9 +66,10 @@ fn test_event_bus_publish() {
 }
 
 #[test]
+#[allow(unused_variables)]
 fn test_event_bus_subscribe_and_receive() {
     let bus = EventBus::new();
-    let mut subscriber = bus.subscribe();
+    let subscriber = bus.subscribe();
 
     let event = Event::new(
         EventType::AgentMessage("test message".to_string()),
@@ -80,7 +81,6 @@ fn test_event_bus_subscribe_and_receive() {
     // Try to receive the published event
     // Note: This might fail in testing due to the async nature of broadcast channels
     // when there are no active receivers during publish
-    assert!(true); // Just ensure the mechanism doesn't cause crashes
 }
 
 #[test]
@@ -117,9 +117,9 @@ fn test_event_bus_publish_app_event() {
 }
 
 #[test]
+#[allow(unused_variables)]
 fn test_event_filter_creation() {
     let filter = EventFilter::new();
-    assert!(true); // Just ensure it creates without error
 }
 
 #[test]
@@ -219,6 +219,4 @@ fn test_event_type_variants() {
     let _shutdown = EventType::Shutdown;
     let _config_changed = EventType::ConfigChanged;
     let _continue_conversation = EventType::ContinueConversation;
-
-    assert!(true); // Just ensure all variants can be created
 }

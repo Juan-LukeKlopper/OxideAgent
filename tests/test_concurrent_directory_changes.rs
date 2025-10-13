@@ -2,9 +2,7 @@
 //! This test will fail if the global tool permissions or session files cause conflicts
 
 use OxideAgent::core::tool_permissions::GlobalToolPermissions;
-use std::env;
 use std::fs;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[test]

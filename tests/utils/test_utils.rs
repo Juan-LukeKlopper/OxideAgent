@@ -10,6 +10,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 
 /// A mock tool for testing purposes
+#[allow(dead_code)]
 pub struct MockTool {
     name: String,
     description: String,
@@ -20,6 +21,7 @@ pub struct MockTool {
 }
 
 impl MockTool {
+    #[allow(dead_code)]
     pub fn new(
         name: &str,
         description: &str,
@@ -78,6 +80,7 @@ impl Tool for MockTool {
 }
 
 /// A mock interface for testing purposes
+#[allow(dead_code)]
 pub struct MockInterface {
     tx: mpsc::Sender<AppEvent>,
     rx: mpsc::Receiver<AppEvent>,
@@ -86,6 +89,7 @@ pub struct MockInterface {
 }
 
 impl MockInterface {
+    #[allow(dead_code)]
     pub fn new(session_name: String) -> (Self, mpsc::Sender<AppEvent>, mpsc::Receiver<AppEvent>) {
         let (tx, rx) = mpsc::channel(32);
         let (interface_tx, interface_rx) = mpsc::channel(32);
@@ -120,10 +124,9 @@ impl OutputHandler for MockInterface {
             }
             AppEvent::AgentStreamChunk(chunk) => {
                 if let Some(last_message) = self.history.last_mut() {
-                    match last_message {
-                        ChatMessage { content, .. } => {
-                            content.push_str(&chunk);
-                        }
+                    let ChatMessage { content, .. } = last_message;
+                    {
+                        content.push_str(&chunk);
                     }
                 } else {
                     self.history.push(ChatMessage::assistant(&chunk));
@@ -176,11 +179,13 @@ impl Interface for MockInterface {
 }
 
 /// Create a mock agent for testing
+#[allow(dead_code)]
 pub fn create_mock_agent() -> Agent {
     Agent::new("MockAgent", "mock-model")
 }
 
 /// Create a test configuration
+#[allow(dead_code)]
 pub fn create_test_config() -> OxideAgent::Config {
     OxideAgent::Config {
         agent: OxideAgent::config::AgentConfig {

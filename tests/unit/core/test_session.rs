@@ -3,7 +3,6 @@
 use OxideAgent::core::session::{SessionManager, SessionState};
 use OxideAgent::types::ChatMessage;
 use std::fs;
-use std::path::Path;
 use tempfile::TempDir;
 
 #[test]
