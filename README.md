@@ -1,4 +1,4 @@
-# OxideAgent 
+# OxideAgent
 
 [![CI](https://github.com/Juan-LukeKlopper/OxideAgent/workflows/CI/badge.svg)](https://github.com/Juan-LukeKlopper/OxideAgent/actions)
 
@@ -9,18 +9,21 @@ A local-first, feature-rich AI agent written in Rust that runs on your machine a
 OxideAgent is a sophisticated AI agent that provides a powerful command-line interface to interact with local language models through the Ollama platform. It offers a unique blend of local-first architecture with cloud-capable extensibility through MCP server integration.
 
 This project has undergone a comprehensive refactoring to improve its architecture, modularity, and maintainability:
+
 - **Modular Architecture**: Clean separation of core logic and interface implementations
 - **Interface Abstraction**: Support for multiple interface types (TUI, future Web, Telegram, etc.)
 - **Configuration Management**: Centralized configuration with validation
 - **Dependency Injection**: Service container for managing component dependencies
 - **Enhanced Event System**: Robust event system for communication between components
 - **Testing Infrastructure**: Comprehensive testing framework with unit and integration tests
+- **MCP Integration**: Full support for Model Context Protocol (MCP) servers for advanced tooling
 
 ## Features
 
 - **Local-First Architecture**: All processing happens on your machine, ensuring privacy and control over your data
 - **Ollama Integration**: Seamlessly connects to the Ollama platform to leverage a wide range of local language models
 - **Multi-Agent Support**: Easily switch between different agents, each configured with a specific model
+- **MCP Server Integration**: Connect to Model Context Protocol servers for advanced tooling (Strava, Garmin, filesystem, web search, etc.)
 - **Persistent Sessions**: The agent remembers your conversation history, allowing you to stop and resume long-running tasks at any time
 - **Streaming Responses**: Get real-time feedback from the agent as it generates a response
 - **Extensible Tool System**: Uses a scalable, trait-based system for adding new tools
@@ -30,6 +33,8 @@ This project has undergone a comprehensive refactoring to improve its architectu
 - **Thinking Process Visualization**: Clearly separates agent reasoning from final responses with expandable/collapsible sections
 - **Multi-Session Management**: Create and switch between multiple named sessions with persistent history
 - **Session History Restoration**: Automatically restores previous conversations when loading a session
+- **Configuration Management**: Supports unified configuration in JSON, YAML, or TOML formats
+- **MCP Spawning**: Ability to spawn MCP tool servers using Docker, NPM (npx), or UVX on demand
 
 ## Technologies Used
 
@@ -40,15 +45,19 @@ This project has undergone a comprehensive refactoring to improve its architectu
 - **Serialization**: Serde with JSON support
 - **CLI Parsing**: Clap
 - **Input Handling**: tui-input
+- **Event System**: Custom event-driven architecture
+- **Dependency Injection**: Container-based service management
 
 ## Installation
 
 1. Clone the repo
+
    ```sh
    git clone https://github.com/Juan-LukeKlopper/OxideAgent.git
    ```
 
 2. Install the required Ollama models
+
    ```sh
    ollama pull qwen3:4b
    ollama pull llama3.2
@@ -56,6 +65,7 @@ This project has undergone a comprehensive refactoring to improve its architectu
    ```
 
 3. Build the project
+
    ```sh
    cargo build --release
    ```
@@ -63,26 +73,31 @@ This project has undergone a comprehensive refactoring to improve its architectu
 ## Usage
 
 To start a chat session with the default agent (`qwen`):
+
 ```sh
 cargo run
 ```
 
 Select a specific agent using the `--agent` flag:
+
 ```sh
 cargo run -- --agent llama
 ```
 
 Start a named session:
+
 ```sh
 cargo run -- --session my_project
 ```
 
 List all sessions:
+
 ```sh
 cargo run -- --list-sessions
 ```
 
 See all available options:
+
 ```sh
 cargo run -- --help
 ```
@@ -100,6 +115,7 @@ The agent has access to several tools that allow it to interact with your system
 1. **write_file**: Write content to a file on your system.
 2. **read_file**: Read content from a file on your system.
 3. **run_shell_command**: Execute shell commands on your system.
+4. **MCP Tools**: Connect to external tools via Model Context Protocol servers for advanced capabilities.
 
 When the agent wants to use a tool, you'll be prompted to approve its execution for security.
 
@@ -132,28 +148,26 @@ The Terminal User Interface provides an enhanced chat experience with several ad
 - **/switch <session_name>**: Switch to a different session from within the TUI
 - **Ctrl+s**: List all available sessions
 
+## Configuration
+
+The application supports configuration through both command-line arguments and config files (JSON, YAML, or TOML). The configuration system prioritizes CLI arguments over configuration file settings when both are provided.
+
+### Configuration File Format
+
+```toml
+[agent]
+agent_type = "Qwen"
+model = "qwen3:4b"
+name = "Qwen"
+system_prompt = "You are a Rust programming expert."
+
+[[mcp.tools]]
+name = "sequential-thinking"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+```
+
 ## Development
-
-This project follows a modular architecture with clear separation of concerns:
-
-### Code Structure
-
-```
-├── src/
-│   ├── agents/           # Agent implementations
-│   ├── cli.rs           # Command-line interface parsing
-│   ├── main.rs          # Main entry point
-│   ├── ollama.rs        # Ollama API integration
-│   ├── orchestrator.rs  # Core orchestration logic
-│   ├── tools.rs         # Tool implementations and registry
-│   ├── tui/             # Terminal User Interface components
-│   └── types.rs         # Shared data structures
-├── Cargo.toml           # Project dependencies and metadata
-├── README.md            # Project documentation
-├── GOAL.md              # Project goals and development roadmap
-├── cool_tricks.md       # Notes on TUI enhancements
-└── session*.json        # Persistent session files
-```
 
 ### Testing
 
@@ -163,16 +177,53 @@ The project includes both unit and integration tests. To run the tests:
 cargo test
 ```
 
-### CI/CD
+### Coverage
 
-The project uses GitHub Actions for continuous integration. The workflow includes:
-- Code formatting checks
-- Clippy linting
-- Building the project
-- Running tests
-- Building documentation
+We aim to have an absolute minimum of 35% test coverage. To get the coverage of the test run:
 
-See `.github/workflows/ci.yml` for details.
+```sh
+cargo tarpaulin -- --test-threads 1
+```
+
+### Code Structure
+
+```sh
+├── src/
+│   ├── core/
+│   │   ├── agents/           # Agent implementations
+│   │   ├── llm/              # LLM integrations
+│   │   ├── session/          # Session management
+│   │   ├── tools/            # Tool implementations
+│   │   ├── container.rs      # Dependency injection container
+│   │   ├── events.rs         # Event system
+│   │   ├── interface.rs      # Interface abstractions
+│   │   └── orchestrator.rs   # Core orchestration logic
+│   ├── interfaces/
+│   │   └── tui/              # Terminal UI implementation
+│   ├── cli.rs                # Command-line interface parsing
+│   ├── config.rs             # Configuration management
+│   ├── main.rs               # Main entry point
+│   ├── mcp.rs                # Model Context Protocol integration
+│   └── types.rs              # Shared data structures
+├── Cargo.toml                # Project dependencies and metadata
+├── README.md                 # Project documentation
+├── ARCHITECTURE.md           # Architecture documentation
+├── config.toml               # Default configuration file
+├── CHANGELOG.md              # Version history
+└── examples/                 # Example implementations
+```
+
+### Event System
+
+The application uses an event-driven architecture with comprehensive event types:
+
+- **UserInput**: User-provided input to the agent
+- **AgentMessage**: Complete messages from the agent
+- **AgentStreamChunk**: Streaming response chunks
+- **ToolRequest**: Request for user approval of tool calls
+- **ToolResult**: Results from executed tools
+- **SessionSwitched**: Notification that session has been switched
+- **SessionHistory**: Session history data for UI updates
 
 ## Planned Expansions
 
@@ -196,17 +247,10 @@ The modular architecture allows for easy integration with messaging platforms li
 3. **Agent Spawning**: Users can spawn and interact with different agents through Telegram commands.
 4. **Tool Approval**: The security model can be adapted to work with Telegram's messaging system.
 
-### MCP Server Integration
-
-The project is designed to integrate with Model Context Protocol (MCP) servers:
-
-1. **External Tools**: Connect to MCP servers for advanced tooling (Strava, Garmin, etc.).
-2. **Local MCP Servers**: Ability to spin up local MCP servers for specific integrations.
-3. **Smart Tool Inclusion**: Dynamically select tools based on the agent's task to avoid exposing unrelated capabilities.
-
 ## Project Roadmap
 
 Current features:
+
 - Basic Ollama connection
 - Interactive multi-agent chat
 - File operations and shell command execution
@@ -217,7 +261,7 @@ Current features:
 - Session history restoration
 
 Future development will focus on:
-- **MCP Server Integration**: Connect to Model Context Protocol servers for advanced tooling
+
 - **Smart Tool & Prompt Inclusion**: Dynamically select tools and system prompts based on the agent's task
 - **Advanced Workflow Management**: Handle complex, multi-step operations with better planning and error handling
 - **Web UI Implementation**: Add a web-based interface for broader accessibility
@@ -226,147 +270,13 @@ Future development will focus on:
 
 ## Contributing
 
-Contributions are welcome. The project follows standard Rust development practices:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is distributed under the MIT License.
-
-## Getting Started
-
-To get a local copy up and running follow these simple steps.
-
-### Prerequisites
-
-*   [Rust](https://www.rust-lang.org/tools/install)
-*   [Ollama](https://ollama.ai/)
-
-### Installation
-
-1.  Clone the repo
-    ```sh
-    git clone https://github.com/your_username/OxideAgent.git
-    ```
-2.  Install the required Ollama models
-    ```sh
-    ollama pull qwen3:4b
-    ollama pull llama3.2
-    ollama pull granite3.3
-    ```
-3.  Build the project
-    ```sh
-    cargo build --release
-    ```
-
-## Usage
-
-To start a chat session with the default agent (`qwen`), run the following command:
-
-```sh
-cargo run
-```
-
-The agent will welcome you back if it finds a previous session file (`session.json`). To start a fresh session, you can delete this file.
-
-You can also select a specific agent using the `--agent` flag:
-
-```sh
-cargo run -- --agent llama
-```
-
-To see a list of available agents, use the `--help` flag:
-
-```sh
-cargo run -- --help
-```
-
-To exit the chat, press `Ctrl+q`.
-
-### Available Agents
-
-1.  **Qwen** (`--agent qwen`): Uses the `qwen3:4b` model. The default agent.
-2.  **Llama** (`--agent llama`): Uses the `llama3.2` model.
-3.  **Granite** (`--agent granite`): Uses the `granite3.3` model.
-
-### Multi-Session Management
-
-OxideAgent supports multiple named sessions, allowing you to work on different tasks simultaneously:
-
-*   Start a named session: `cargo run -- --session my_project`
-*   List all sessions: `cargo run -- --list-sessions`
-*   Switch between sessions within the TUI using `/switch session_name`
-
-### Tool Capabilities
-
-The agent has access to several tools that allow it to interact with your system:
-
-1.  **write_file**: Write content to a file on your system.
-2.  **read_file**: Read content from a file on your system.
-3.  **run_shell_command**: Execute shell commands on your system.
-
-When the agent wants to use a tool, you'll be prompted to approve its execution for security.
-
-## TUI Features
-
-The Terminal User Interface provides an enhanced chat experience with several advanced features:
-
-*   **Collapsible Reasoning Sections**: Agent thinking processes are displayed in expandable/collapsible sections marked with `[Click to expand/collapse]`
-*   **Collapsible Tool Outputs**: Tool execution results are also displayed in expandable/collapsible sections by default
-*   **Real-time Streaming**: Watch responses appear character-by-character as they're generated
-*   **Mouse Support**: Click on section headers to expand or collapse content
-*   **Improved Layout**: Better organized chat history with clear visual separation between different message types
-*   **Session Management**: View and switch between sessions directly from the TUI
-*   **Help System**: Press `Ctrl+o` to display all available commands and shortcuts
-
-### TUI Keyboard Shortcuts
-
-*   **Ctrl+q**: Quit the application
-*   **Ctrl+s**: List available sessions
-*   **Ctrl+o**: Show help message with all commands
-*   **Mouse Click**: Expand/collapse reasoning and tool output sections
-*   **Tool Approval Options** (when prompted):
-    *   1: Allow tool execution
-    *   2: Always allow this tool
-    *   3: Always allow this tool for this session
-    *   4: Deny tool execution
-
-### Session Commands
-
-*   **/switch <session_name>**: Switch to a different session from within the TUI
-*   **Ctrl+s**: List all available sessions
-
-## Project Roadmap
-
-The project has a solid foundation with the following features already implemented:
-*   Basic Ollama connection
-*   Interactive multi-agent chat
-*   File operations and shell command execution
-*   A "smart" native tool-calling system
-*   An orchestrator with persistent memory for resumable sessions
-*   Advanced TUI with collapsible sections for better visualization
-*   Multi-session management with named sessions
-*   Session history restoration
-
-Future development will focus on expanding the agent's capabilities:
-*   **MCP Server Integration:** Connect to Model Context Protocol servers for advanced tooling.
-*   **Smart Tool & Prompt Inclusion:** Dynamically select tools and system prompts based on the agent's task.
-*   **Advanced Workflow Management:** Handle complex, multi-step operations with better planning and error handling.
-
-## Contributing
-
 Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## License
 
