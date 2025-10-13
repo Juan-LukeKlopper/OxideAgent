@@ -35,14 +35,14 @@ pub struct Args {
     pub config: Option<String>,
 }
 
-#[derive(ValueEnum, Debug, Clone)]
+#[derive(ValueEnum, Debug, Clone, PartialEq)]
 pub enum AgentType {
     Qwen,
     Llama,
     Granite,
 }
 
-#[derive(ValueEnum, Debug, Clone)]
+#[derive(ValueEnum, Debug, Clone, PartialEq)]
 pub enum InterfaceType {
     Tui,
     // In the future we could add Web, Telegram, etc.
