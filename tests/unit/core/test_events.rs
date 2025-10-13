@@ -219,5 +219,4 @@ fn test_event_type_variants() {
     let _shutdown = EventType::Shutdown;
     let _config_changed = EventType::ConfigChanged;
     let _continue_conversation = EventType::ContinueConversation;
-
 }
