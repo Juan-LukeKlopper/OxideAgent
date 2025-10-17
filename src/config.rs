@@ -8,7 +8,7 @@ use std::fs;
 use std::path::Path;
 
 /// Application configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct OxideConfig {
     /// Agent configuration section
     #[serde(default)]
@@ -117,8 +117,8 @@ pub struct LLMConfig {
     pub provider: String,
 
     /// API base URL (for providers like OpenAI)
-    #[serde(default)]
-    pub api_base: Option<String>,
+    #[serde(default = "default_api_base")]
+    pub api_base: String,
 
     /// API key (for providers like OpenAI)
     #[serde(default)]
@@ -138,7 +138,7 @@ impl From<crate::cli::InterfaceType> for InterfaceType {
 }
 
 fn default_model() -> String {
-    "qwen3:4b".to_string()
+    "".to_string()
 }
 
 fn default_name() -> String {
@@ -151,6 +151,10 @@ fn default_system_prompt() -> String {
 
 fn default_provider() -> String {
     "ollama".to_string()
+}
+
+pub fn default_api_base() -> String {
+    "http://localhost:11434".to_string()
 }
 
 impl OxideConfig {
