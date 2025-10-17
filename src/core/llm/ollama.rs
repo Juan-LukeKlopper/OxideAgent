@@ -1,9 +1,27 @@
 use crate::types::{AppEvent, ChatMessage, Tool, ToolCall};
 use futures_util::StreamExt;
 use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, trace};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OllamaTag {
+    name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct OllamaTags {
+    models: Vec<OllamaTag>,
+}
+
+pub async fn list_models(client: &Client, api_base: &str) -> anyhow::Result<Vec<String>> {
+    let url = format!("{}/api/tags", api_base);
+    let response = client.get(&url).send().await?;
+    let tags: OllamaTags = response.json().await?;
+    Ok(tags.models.into_iter().map(|t| t.name).collect())
+}
 
 pub async fn send_chat(
     client: &Client,
@@ -12,6 +30,7 @@ pub async fn send_chat(
     tools: &[Tool],
     stream: bool,
     tx: mpsc::Sender<AppEvent>,
+    api_base: &str,
 ) -> anyhow::Result<Option<ChatMessage>> {
     info!("=== OLLAMA REQUEST START ===");
     info!("Sending chat request to Ollama model: {}", model);
@@ -53,15 +72,12 @@ pub async fn send_chat(
         info!("Full request payload:\n{}", payload_str);
     }
 
-    info!("Making HTTP POST request to: http://localhost:11434/api/chat");
+    let url = format!("{}/api/chat", api_base);
+    info!("Making HTTP POST request to: {}", url);
 
     // Add detailed HTTP request tracing
     trace!("Sending HTTP request with headers and payload to Ollama API");
-    let response_result = client
-        .post("http://localhost:11434/api/chat")
-        .json(&request_payload)
-        .send()
-        .await;
+    let response_result = client.post(&url).json(&request_payload).send().await;
 
     match &response_result {
         Ok(response) => {
