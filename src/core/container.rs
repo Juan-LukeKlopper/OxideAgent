@@ -21,16 +21,18 @@ pub struct Container {
     tool_registry: Option<ToolRegistry>,
     #[allow(dead_code)]
     session_manager: Option<SessionManager>,
+    pub available_models: Arc<Vec<String>>,
 }
 
 impl Container {
     /// Create a new container with the given configuration
-    pub fn new(config: OxideConfig) -> Self {
+    pub fn new(config: OxideConfig, available_models: Vec<String>) -> Self {
         Self {
             config: Arc::new(config),
             agent: None,
             tool_registry: None,
             session_manager: None,
+            available_models: Arc::new(available_models),
         }
     }
 
@@ -121,6 +123,7 @@ impl Container {
         let no_stream = self.config.no_stream;
         let agent_name = self.config.agent.name.clone();
         let agent_model = self.config.agent.model.clone();
+        let llm_config = self.config.llm.clone();
 
         // Build dependencies (we call these to ensure they're initialized)
         let _agent = self.build_agent()?;
@@ -136,6 +139,8 @@ impl Container {
             no_stream,
             orchestrator_tx,
             orchestrator_rx,
+            self.available_models.clone(),
+            llm_config,
         ))
     }
 }
