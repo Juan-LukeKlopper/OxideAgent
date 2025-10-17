@@ -1,9 +1,11 @@
+use crate::config::LLMConfig;
 use crate::core::agents::Agent;
 use crate::core::session::{SessionManager, SessionState};
 use crate::core::tool_permissions::GlobalToolPermissions;
 use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -18,9 +20,12 @@ pub struct Orchestrator {
     rx: mpsc::Receiver<AppEvent>,
     pending_tool_calls: Option<Vec<ToolCall>>,
     global_permissions: GlobalToolPermissions,
+    available_models: Arc<Vec<String>>,
+    llm_config: LLMConfig,
 }
 
 impl Orchestrator {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         agent: Agent,
         tool_registry: ToolRegistry,
@@ -28,6 +33,8 @@ impl Orchestrator {
         no_stream: bool,
         tx: mpsc::Sender<AppEvent>,
         rx: mpsc::Receiver<AppEvent>,
+        available_models: Arc<Vec<String>>,
+        llm_config: LLMConfig,
     ) -> Self {
         let session_file = match session_name {
             Some(name) => format!("session_{}.json", name),
@@ -48,6 +55,8 @@ impl Orchestrator {
             rx,
             pending_tool_calls: None,
             global_permissions,
+            available_models,
+            llm_config,
         }
     }
 
@@ -148,8 +157,10 @@ impl Orchestrator {
                     };
 
                     // Create new agent
-                    let new_agent =
-                        crate::core::agents::Agent::new(agent_type.name(), agent_type.model());
+                    let new_agent = crate::core::agents::Agent::new(
+                        agent_type.name(),
+                        agent_type.model(&self.available_models),
+                    );
 
                     // Replace the current agent
                     self.agent = new_agent;
@@ -322,6 +333,7 @@ impl Orchestrator {
                 &tool_definitions,
                 !self.no_stream,
                 self.tx.clone(),
+                &self.llm_config.api_base,
             )
             .await?;
 
