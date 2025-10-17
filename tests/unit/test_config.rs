@@ -24,7 +24,7 @@ fn test_config_creation() {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
@@ -57,7 +57,7 @@ fn test_config_validation_valid() {
         interface: InterfaceType::Tui,
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
@@ -86,7 +86,7 @@ fn test_config_validation_mcp_missing_token() {
         interface: InterfaceType::Tui,
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
@@ -119,7 +119,7 @@ fn test_config_validation_invalid_session_name() {
         interface: InterfaceType::Tui,
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },

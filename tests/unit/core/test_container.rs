@@ -8,7 +8,12 @@ use tokio::sync::mpsc;
 #[test]
 fn test_container_new() {
     let config = create_test_config();
-    let container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let container = Container::new(config, available_models.clone());
 
     // Verify config is accessible
     assert_eq!(container.config().agent.name, "Qwen");
@@ -17,19 +22,29 @@ fn test_container_new() {
 #[test]
 fn test_container_build_agent() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     let agent = container.build_agent();
     assert!(agent.is_ok());
 
     let agent = agent.unwrap();
-    assert_eq!(agent.model, "qwen3:4b");
+    assert_eq!(agent.model, "qwen:latest");
 }
 
 #[tokio::test]
 async fn test_container_build_tool_registry() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     let tool_registry = container.build_tool_registry().await;
     assert!(tool_registry.is_ok());
@@ -52,7 +67,12 @@ async fn test_container_build_tool_registry() {
 #[test]
 fn test_container_build_session_manager() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     let session_manager = container.build_session_manager();
     assert!(session_manager.is_ok());
@@ -61,7 +81,12 @@ fn test_container_build_session_manager() {
 #[tokio::test]
 async fn test_container_build_orchestrator() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
 
@@ -74,7 +99,12 @@ async fn test_container_build_orchestrator() {
 #[test]
 fn test_container_config_accessors() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     // Test config accessor
     assert_eq!(container.config().agent.name, "Qwen");
@@ -87,7 +117,12 @@ fn test_container_config_accessors() {
 #[tokio::test]
 async fn test_container_multiple_build_calls() {
     let config = create_test_config();
-    let mut container = Container::new(config);
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+    let mut container = Container::new(config, available_models.clone());
 
     // Building components multiple times should not cause issues
     let agent1 = container.build_agent();
@@ -107,7 +142,7 @@ fn create_test_config() -> Config {
     Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -122,7 +157,7 @@ fn create_test_config() -> Config {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },

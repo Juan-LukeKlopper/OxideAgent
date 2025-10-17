@@ -9,10 +9,11 @@ use tokio::sync::mpsc;
 
 #[test]
 fn test_orchestrator_creation() {
+    let available_models = vec!["qwen:latest".to_string(), "llama3:latest".to_string(), "granite:latest".to_string()];
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -24,7 +25,7 @@ fn test_orchestrator_creation() {
         interface: InterfaceType::Tui,
     };
 
-    let mut container = Container::new(config);
+    let mut container = Container::new(config, available_models.clone());
 
     let (orchestrator_tx, _interface_rx) = mpsc::channel::<AppEvent>(32);
     let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
