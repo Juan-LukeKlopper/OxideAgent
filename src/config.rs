@@ -473,7 +473,10 @@ model = "gpt-4"
     fn test_default_functions() {
         assert_eq!(default_model(), "");
         assert_eq!(default_name(), "Qwen");
-        assert_eq!(default_system_prompt(), "You are a Rust programming expert.");
+        assert_eq!(
+            default_system_prompt(),
+            "You are a Rust programming expert."
+        );
         assert_eq!(default_provider(), "ollama");
         assert_eq!(default_api_base(), "http://localhost:11434");
     }
@@ -481,7 +484,10 @@ model = "gpt-4"
     #[test]
     fn test_interface_type_from_cli() {
         use crate::cli::InterfaceType as CliInterfaceType;
-        assert_eq!(InterfaceType::from(CliInterfaceType::Tui), InterfaceType::Tui);
+        assert_eq!(
+            InterfaceType::from(CliInterfaceType::Tui),
+            InterfaceType::Tui
+        );
     }
 
     #[test]
@@ -498,7 +504,13 @@ model = "gpt-4"
         config.mcp.server = Some("http://localhost:8080".to_string());
         config.mcp.auth_token = None;
         assert!(config.validate().is_err());
-        assert!(config.validate().unwrap_err().to_string().contains("MCP server specified but no auth token provided"));
+        assert!(
+            config
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("MCP server specified but no auth token provided")
+        );
     }
 
     #[test]
@@ -508,13 +520,13 @@ model = "gpt-4"
             ..Default::default()
         };
         assert!(config.validate().is_err());
-        
+
         let config = OxideConfig {
             session: Some("test\\session".to_string()), // Contains invalid backslash
             ..Default::default()
         };
         assert!(config.validate().is_err());
-        
+
         let config = OxideConfig {
             session: Some("test:session".to_string()), // Contains invalid colon
             ..Default::default()

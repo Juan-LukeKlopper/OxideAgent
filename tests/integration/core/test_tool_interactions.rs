@@ -20,7 +20,12 @@ lazy_static! {
 #[tokio::test]
 #[allow(unused_variables)]
 async fn test_tool_execution_workflow() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    // Acquire and immediately release the mutex before any await points
+    {
+        let _guard = CWD_MUTEX.lock().unwrap();
+        // Just ensure any setup is done while holding the lock, but don't do async work
+    }
+
     let available_models = vec![
         "qwen:latest".to_string(),
         "llama3:latest".to_string(),

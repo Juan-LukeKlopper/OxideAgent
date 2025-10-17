@@ -20,10 +20,7 @@ fn test_agent_type_models() {
 #[test]
 fn test_agent_type_models_fallback_to_first() {
     // Test when the specific model is not found but there is a first model
-    let available_models = vec![
-        "other:latest".to_string(),
-        "another:latest".to_string(),
-    ];
+    let available_models = vec!["other:latest".to_string(), "another:latest".to_string()];
 
     assert_eq!(AgentType::Qwen.model(&available_models), "other:latest");
     assert_eq!(AgentType::Llama.model(&available_models), "other:latest");
