@@ -52,6 +52,7 @@ pub struct Tui {
     // Track selection state for switcher navigation
     switcher_selection: SwitcherSelection,
     available_sessions: Vec<String>,
+    switcher_scroll: usize,
 }
 
 impl Tui {
@@ -60,6 +61,7 @@ impl Tui {
         tx: mpsc::Sender<AppEvent>,
         session_name: String,
         session_history: Vec<ChatMessage>,
+        available_models: Vec<String>,
     ) -> anyhow::Result<Self> {
         let mut stdout = io::stdout();
         enable_raw_mode()?;
@@ -88,16 +90,13 @@ impl Tui {
             show_status_overlay: false,
             show_switcher_overlay: false,
             current_agent: session_name.clone(),
-            available_agents: vec![
-                "Qwen".to_string(),
-                "Llama".to_string(),
-                "Granite".to_string(),
-            ],
+            available_agents: available_models,
             message_positions: Vec::new(),
             session_name,
             // Initialize switcher selection state
             switcher_selection: SwitcherSelection::Agent(0),
             available_sessions,
+            switcher_scroll: 0,
         })
     }
 
@@ -159,6 +158,7 @@ impl Tui {
                     &self.available_agents,
                     self.switcher_selection,
                     &self.available_sessions,
+                    self.switcher_scroll,
                 );
             })?;
 
@@ -423,40 +423,59 @@ impl Tui {
             SwitcherSelection::Agent(idx) => {
                 if idx > 0 {
                     self.switcher_selection = SwitcherSelection::Agent(idx - 1);
+                    if idx - 1 < self.switcher_scroll {
+                        self.switcher_scroll = idx - 1;
+                    }
                 } else {
-                    // Move to last session
                     self.switcher_selection =
                         SwitcherSelection::Session(self.available_sessions.len().saturating_sub(1));
+                    self.switcher_scroll =
+                        self.available_agents.len() + self.available_sessions.len() + 1;
                 }
             }
             SwitcherSelection::Session(idx) => {
                 if idx > 0 {
                     self.switcher_selection = SwitcherSelection::Session(idx - 1);
+                    if self.available_agents.len() + 1 + idx - 1 < self.switcher_scroll {
+                        self.switcher_scroll = self.available_agents.len() + 1 + idx - 1;
+                    }
                 } else {
-                    // Move to last agent
                     self.switcher_selection =
                         SwitcherSelection::Agent(self.available_agents.len().saturating_sub(1));
+                    self.switcher_scroll = self.available_agents.len() - 1;
                 }
             }
         }
     }
 
     fn navigate_switcher_down(&mut self) {
+        let panel_height = 15; // Should match the constraint length
         match self.switcher_selection {
             SwitcherSelection::Agent(idx) => {
                 if idx + 1 < self.available_agents.len() {
                     self.switcher_selection = SwitcherSelection::Agent(idx + 1);
+                    if idx + 1 >= self.switcher_scroll + panel_height {
+                        self.switcher_scroll = idx + 1 - panel_height + 1;
+                    }
                 } else {
-                    // Move to first session
                     self.switcher_selection = SwitcherSelection::Session(0);
+                    if self.available_agents.len() + 1 >= self.switcher_scroll + panel_height {
+                        self.switcher_scroll = self.available_agents.len() + 1 - panel_height + 1;
+                    }
                 }
             }
             SwitcherSelection::Session(idx) => {
                 if idx + 1 < self.available_sessions.len() {
                     self.switcher_selection = SwitcherSelection::Session(idx + 1);
+                    if self.available_agents.len() + 1 + idx + 1
+                        >= self.switcher_scroll + panel_height
+                    {
+                        self.switcher_scroll =
+                            self.available_agents.len() + 1 + idx + 1 - panel_height + 1;
+                    }
                 } else {
-                    // Move to first agent
                     self.switcher_selection = SwitcherSelection::Agent(0);
+                    self.switcher_scroll = 0;
                 }
             }
         }
@@ -468,9 +487,19 @@ impl Tui {
                 if idx < self.available_agents.len() {
                     let selected_agent = &self.available_agents[idx];
                     if selected_agent != &self.current_agent {
+                        let agent_type_name = if selected_agent.contains("qwen") {
+                            "Qwen"
+                        } else if selected_agent.contains("llama") {
+                            "Llama"
+                        } else if selected_agent.contains("granite") {
+                            "Granite"
+                        } else {
+                            selected_agent
+                        };
+
                         // Send switch agent event to orchestrator
                         self.tx
-                            .send(AppEvent::SwitchAgent(selected_agent.clone()))
+                            .send(AppEvent::SwitchAgent(agent_type_name.to_string()))
                             .await?;
                         self.messages
                             .push(Message::User(format!("/switch agent {}", selected_agent)));
@@ -756,6 +785,7 @@ fn ui(
     available_agents: &[String],
     switcher_selection: SwitcherSelection,
     available_sessions: &[String],
+    switcher_scroll: usize,
 ) {
     if show_switcher_overlay {
         // Multipane layout with switcher panel
@@ -781,6 +811,7 @@ fn ui(
             session_name,
             available_sessions,
             switcher_selection,
+            switcher_scroll,
         );
         render_input_box(f, chunks[2], input, tool_calls, is_awaiting_confirmation);
     } else {
@@ -796,6 +827,7 @@ fn ui(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_switcher_panel(
     f: &mut Frame,
     area: Rect,
@@ -804,6 +836,7 @@ fn render_switcher_panel(
     current_session: &str,
     available_sessions: &[String],
     switcher_selection: SwitcherSelection,
+    switcher_scroll: usize,
 ) {
     let block = Block::default()
         .title("Switch Agent/Session (Press Ctrl+a or Esc to close)")
@@ -814,65 +847,81 @@ fn render_switcher_panel(
     let inner_area = block.inner(area);
     f.render_widget(block, area);
 
-    // Render available agents
     let mut text = String::new();
-    text.push_str("Available Agents:\n");
+    let total_items = available_agents.len() + available_sessions.len() + 2; // +2 for headers
+    let panel_height = inner_area.height as usize;
+
+    let mut current_line = 0;
+
+    // Agents
+    if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+        text.push_str("Available Agents:\n");
+    }
+    current_line += 1;
 
     for (idx, agent) in available_agents.iter().enumerate() {
-        let is_selected = match switcher_selection {
-            SwitcherSelection::Agent(selected_idx) => selected_idx == idx,
-            _ => false,
-        };
+        if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+            let is_selected = match switcher_selection {
+                SwitcherSelection::Agent(selected_idx) => selected_idx == idx,
+                _ => false,
+            };
 
-        if agent == current_agent {
-            if is_selected {
-                // Highlight current selected agent with bright color
-                text.push_str(&format!("  -> [{}] (current, selected)\n", agent));
+            if agent == current_agent {
+                if is_selected {
+                    text.push_str(&format!("  -> [{}] (current, selected)\n", agent));
+                } else {
+                    text.push_str(&format!("     {} (current)\n", agent));
+                }
+            } else if is_selected {
+                text.push_str(&format!("  -> [{}]\n", agent));
             } else {
-                // Highlight current agent
-                text.push_str(&format!("     {} (current)\n", agent));
+                text.push_str(&format!("     {}\n", agent));
             }
-        } else if is_selected {
-            // Highlight selected agent with bright color
-            text.push_str(&format!("  -> [{}]\n", agent));
-        } else {
-            text.push_str(&format!("     {}\n", agent));
         }
+        current_line += 1;
     }
 
-    text.push_str("\nAvailable Sessions:\n");
+    // Sessions
+    if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+        text.push_str("\nAvailable Sessions:\n");
+    }
+    current_line += 2; // accounts for the blank line
 
-    // Render available sessions
     for (idx, session) in available_sessions.iter().enumerate() {
-        let is_selected = match switcher_selection {
-            SwitcherSelection::Session(selected_idx) => selected_idx == idx,
-            _ => false,
-        };
+        if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+            let is_selected = match switcher_selection {
+                SwitcherSelection::Session(selected_idx) => selected_idx == idx,
+                _ => false,
+            };
 
-        if session == current_session {
-            if is_selected {
-                // Highlight current selected session with bright color
-                text.push_str(&format!("  -> [{}] (current, selected)\n", session));
+            if session == current_session {
+                if is_selected {
+                    text.push_str(&format!("  -> [{}] (current, selected)\n", session));
+                } else {
+                    text.push_str(&format!("     {} (current)\n", session));
+                }
+            } else if is_selected {
+                text.push_str(&format!("  -> [{}]\n", session));
             } else {
-                // Highlight current session
-                text.push_str(&format!("     {} (current)\n", session));
+                text.push_str(&format!("     {}\n", session));
             }
-        } else if is_selected {
-            // Highlight selected session with bright color\n
-            text.push_str(&format!("  -> [{}]\\n", session));
-        } else {
-            text.push_str(&format!("     {}\\n", session));
         }
+        current_line += 1;
+    }
+
+    if total_items > panel_height {
+        text.push_str(&format!(
+            "\n... {}/{} ...",
+            switcher_scroll + panel_height,
+            total_items
+        ));
     }
 
     text.push_str("\nUse Up/Down arrows to navigate, Enter to select.\n");
 
-    // Create a paragraph with high-contrast text on the solid background
-    let switcher_paragraph = Paragraph::new(text).wrap(Wrap { trim: true }).style(
-        Style::default()
-            .bg(Color::Rgb(20, 20, 35)) // Match background color for consistency
-            .fg(Color::White),
-    ); // High-contrast white text
+    let switcher_paragraph = Paragraph::new(text)
+        .wrap(Wrap { trim: true })
+        .style(Style::default().bg(Color::Rgb(20, 20, 35)).fg(Color::White));
     f.render_widget(switcher_paragraph, inner_area);
 }
 

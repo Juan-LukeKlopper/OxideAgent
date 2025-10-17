@@ -3,9 +3,38 @@ use clap::Parser;
 
 #[test]
 fn test_agent_type_models() {
-    assert_eq!(AgentType::Qwen.model(), "qwen3:4b");
-    assert_eq!(AgentType::Llama.model(), "llama3.2");
-    assert_eq!(AgentType::Granite.model(), "smolLM2");
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
+
+    assert_eq!(AgentType::Qwen.model(&available_models), "qwen:latest");
+    assert_eq!(AgentType::Llama.model(&available_models), "llama3:latest");
+    assert_eq!(
+        AgentType::Granite.model(&available_models),
+        "granite:latest"
+    );
+}
+
+#[test]
+fn test_agent_type_models_fallback_to_first() {
+    // Test when the specific model is not found but there is a first model
+    let available_models = vec!["other:latest".to_string(), "another:latest".to_string()];
+
+    assert_eq!(AgentType::Qwen.model(&available_models), "other:latest");
+    assert_eq!(AgentType::Llama.model(&available_models), "other:latest");
+    assert_eq!(AgentType::Granite.model(&available_models), "other:latest");
+}
+
+#[test]
+fn test_agent_type_models_fallback_to_empty() {
+    // Test when no models are available at all
+    let available_models: Vec<String> = vec![];
+
+    assert_eq!(AgentType::Qwen.model(&available_models), "");
+    assert_eq!(AgentType::Llama.model(&available_models), "");
+    assert_eq!(AgentType::Granite.model(&available_models), "");
 }
 
 #[test]

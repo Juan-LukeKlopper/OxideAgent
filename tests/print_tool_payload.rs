@@ -118,7 +118,7 @@ fn main() {
     ];
 
     let request_payload = json!({
-        "model": "qwen3:4b",
+        "model": "<your model>",
         "messages": [
             {"role": "user", "content": "Can you help me solve this problem?"}
         ],

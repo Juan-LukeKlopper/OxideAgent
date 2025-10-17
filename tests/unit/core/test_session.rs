@@ -188,13 +188,21 @@ fn test_session_manager_load_invalid_json() {
     assert_eq!(session_state.list_allowed_tools().len(), 0);
 }
 
+use lazy_static::lazy_static;
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref CWD_MUTEX: Mutex<()> = Mutex::new(());
+}
+
 #[test]
 fn test_session_manager_list_sessions_default() {
+    let _guard = CWD_MUTEX.lock().unwrap();
     let temp_dir = TempDir::new().unwrap();
     let original_cwd = std::env::current_dir().unwrap();
 
     // Change to temp directory for testing
-    std::env::set_current_dir(&temp_dir).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     // Create a default session file
     let default_session = "session.json";
@@ -225,11 +233,12 @@ fn test_session_manager_list_sessions_default() {
 
 #[test]
 fn test_session_manager_list_sessions_named() {
+    let _guard = CWD_MUTEX.lock().unwrap();
     let temp_dir = TempDir::new().unwrap();
     let original_cwd = std::env::current_dir().unwrap();
 
     // Change to temp directory for testing
-    std::env::set_current_dir(&temp_dir).unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     // Create a named session file
     let named_session = "session_test_named.json";

@@ -121,6 +121,18 @@ async fn main() -> Result<()> {
         }),
     ];
 
+    let client = Client::new();
+    let available_models =
+        match OxideAgent::core::llm::ollama::list_models(&client, "http://localhost:11434").await {
+            Ok(models) => models,
+            Err(e) => {
+                println!("Error fetching Ollama models: {}", e);
+                return Ok(());
+            }
+        };
+
+    let model = available_models.first().unwrap();
+
     // Create a simple message history
     let messages = vec![json!({
         "role": "user",
@@ -129,7 +141,7 @@ async fn main() -> Result<()> {
 
     // Create the request payload exactly as the agent would
     let request_payload = json!({
-        "model": "qwen3:4b",
+        "model": model,
         "messages": messages,
         "tools": tools,
         "stream": false

@@ -186,11 +186,11 @@ pub fn create_mock_agent() -> Agent {
 
 /// Create a test configuration
 #[allow(dead_code)]
-pub fn create_test_config() -> OxideAgent::Config {
-    OxideAgent::Config {
+pub fn create_test_config() -> OxideAgent::config::OxideConfig {
+    OxideAgent::config::OxideConfig {
         agent: OxideAgent::config::AgentConfig {
             agent_type: OxideAgent::config::AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -205,7 +205,7 @@ pub fn create_test_config() -> OxideAgent::Config {
         interface: OxideAgent::config::InterfaceType::Tui,
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11343".to_string(),
             api_key: None,
             model: None,
         },

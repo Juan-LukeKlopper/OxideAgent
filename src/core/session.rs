@@ -185,11 +185,11 @@ impl SessionManager {
 
     /// List all available sessions
     pub fn list_sessions() -> anyhow::Result<Vec<String>> {
-        let mut sessions = Vec::new();
+        let mut sessions = std::collections::HashSet::new();
 
         // Check for the default session file
         if Path::new("session.json").exists() {
-            sessions.push("default".to_string());
+            sessions.insert("default".to_string());
         }
 
         // Look for named session files with retry mechanism to handle race conditions
@@ -219,17 +219,17 @@ impl SessionManager {
                 && file_name_str.starts_with("session_")
                 && file_name_str.ends_with(".json")
             {
-                // Extract session name from file name (remove "session_" prefix and ".json" suffix)
+                // Extract session name from file name
                 let session_name = file_name_str
                     .strip_prefix("session_")
                     .unwrap()
                     .strip_suffix(".json")
                     .unwrap();
-                sessions.push(session_name.to_string());
+                sessions.insert(session_name.to_string());
             }
         }
 
-        Ok(sessions)
+        Ok(sessions.into_iter().collect())
     }
 
     /// Get the session filename for a given session name

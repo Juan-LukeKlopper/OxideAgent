@@ -1,8 +1,13 @@
 [agent]
 agent_type = "Qwen"
-model = "qwen3:4b"
+model = ""
 name = "Qwen"
 system_prompt = "You are a Rust programming expert."
+
+[[mcp.tools]]
+name = "sequential-thinking"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sequential-thinking"]
 
 [mcp]
 server = "https://mcp.docs.astro.build/mcp"

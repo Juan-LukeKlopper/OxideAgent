@@ -39,9 +39,31 @@ async fn main() -> anyhow::Result<()> {
     // Create HTTP client
     let client = Client::new();
 
+    // Fetch available models
+    let available_models =
+        match OxideAgent::core::llm::ollama::list_models(&client, "http://localhost:11434").await {
+            Ok(models) => models,
+            Err(e) => {
+                println!("Error fetching Ollama models: {}", e);
+                return Ok(());
+            }
+        };
+
+    let model = available_models.first().unwrap();
+
     // Send the chat request and see what gets logged
     println!("Sending test chat request...");
-    match send_chat(&client, "qwen3:4b", &history, &tools, false, tx).await {
+    match send_chat(
+        &client,
+        model,
+        &history,
+        &tools,
+        false,
+        tx,
+        "http://localhost:11434",
+    )
+    .await
+    {
         Ok(response) => {
             println!("Got response: {:?}", response);
         }

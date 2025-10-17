@@ -10,29 +10,30 @@ use tokio::sync::mpsc;
 
 #[tokio::test]
 #[allow(unused_variables, unused_mut)]
-async fn test_orchestrator_full_interaction_cycle() {
+async fn test_tool_execution_workflow() {
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
         no_stream: true, // Use non-streaming for easier testing
-        session: Some("test_integration_session".to_string()),
-        list_sessions: false,
-        interface: InterfaceType::Tui,
-        mcp: OxideAgent::config::MCPConfig {
-            server: None,
-            auth_token: None,
-            tools: vec![],
-        },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
+        interface: InterfaceType::Tui,
+        list_sessions: false,
+        mcp: Default::default(),
+        session: None,
     };
 
     // Create channels for communication
@@ -40,7 +41,7 @@ async fn test_orchestrator_full_interaction_cycle() {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config);
+    let mut container = Container::new(config, available_models.clone());
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
@@ -60,6 +61,11 @@ async fn test_orchestrator_full_interaction_cycle() {
 
 #[tokio::test]
 async fn test_orchestrator_session_switching() {
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
@@ -78,7 +84,7 @@ async fn test_orchestrator_session_switching() {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
@@ -89,7 +95,7 @@ async fn test_orchestrator_session_switching() {
     let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config);
+    let mut container = Container::new(config, available_models.clone());
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
@@ -114,6 +120,11 @@ async fn test_orchestrator_session_switching() {
 #[tokio::test]
 #[allow(unused_variables, unused_mut)]
 async fn test_orchestrator_tool_approvals() {
+    let available_models = vec![
+        "qwen:latest".to_string(),
+        "llama3:latest".to_string(),
+        "granite:latest".to_string(),
+    ];
     // Create a temporary session to avoid conflicts with other tests
     let temp_session_name = "temp_tool_approval_test";
     let session_file = format!("session_{}.json", temp_session_name);
@@ -139,7 +150,7 @@ async fn test_orchestrator_tool_approvals() {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
@@ -150,7 +161,7 @@ async fn test_orchestrator_tool_approvals() {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config);
+    let mut container = Container::new(config, available_models.clone());
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await

@@ -10,6 +10,7 @@ use crate::core::interface::Interface;
 use crate::interfaces::tui::Tui;
 use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
+use reqwest::Client;
 use tokio::sync::mpsc;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
@@ -28,6 +29,28 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let args = cli::Args::parse();
+    let client = Client::new();
+
+    let llm_config = config::LLMConfig {
+        provider: "ollama".to_string(),
+        api_base: args
+            .llm_api_base
+            .clone()
+            .unwrap_or_else(config::default_api_base),
+        api_key: args.llm_api_key.clone(),
+        model: args.llm_model.clone(),
+    };
+
+    // Fetch the list of available Ollama models
+    let available_models = match core::llm::ollama::list_models(&client, &llm_config.api_base).await
+    {
+        Ok(models) => models,
+        Err(e) => {
+            eprintln!("Error fetching Ollama models: {}", e);
+            // Exit gracefully if Ollama is not available
+            return Ok(());
+        }
+    };
 
     // Load configuration from file if specified, otherwise use default config
     let config_from_file = if let Some(config_path) = &args.config {
@@ -37,10 +60,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Create base configuration from CLI arguments with defaults
-    let base_config = create_default_config_from_cli(&args);
+    let base_config = create_default_config_from_cli(&args, &available_models, &llm_config);
 
     // Merge the configurations - CLI args take precedence over config file
-    let config = merge_configs(config_from_file, base_config, &args);
+    let config = merge_configs(config_from_file, base_config, &args, &available_models);
 
     // Validate the configuration
     config.validate()?;
@@ -66,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create the container
-    let mut container = crate::core::container::Container::new(config);
+    let mut container = crate::core::container::Container::new(config, available_models.clone());
 
     // Determine the session name for display
     let session_name = container
@@ -104,6 +127,7 @@ async fn main() -> anyhow::Result<()> {
         interface_tx,
         session_name.clone(), // Clone to keep original for logging
         session_history,
+        available_models,
     )?;
 
     info!("Interface created successfully");
@@ -128,20 +152,22 @@ async fn main() -> anyhow::Result<()> {
 }
 
 // Create a default configuration based on CLI arguments (with defaults when not specified)
-fn create_default_config_from_cli(args: &cli::Args) -> config::OxideConfig {
+fn create_default_config_from_cli(
+    args: &cli::Args,
+    available_models: &[String],
+    llm_config: &config::LLMConfig,
+) -> config::OxideConfig {
     // Set default agent if not specified in CLI
     let agent_type = args.agent.clone().unwrap_or(cli::AgentType::Qwen);
+    let model = agent_type.model(available_models).to_string();
+
     let agent_config = config::AgentConfig {
         agent_type: match agent_type {
             cli::AgentType::Qwen => config::AgentType::Qwen,
             cli::AgentType::Llama => config::AgentType::Llama,
             cli::AgentType::Granite => config::AgentType::Granite,
         },
-        model: match agent_type {
-            cli::AgentType::Qwen => "qwen3:4b".to_string(),
-            cli::AgentType::Llama => "llama3.2".to_string(),
-            cli::AgentType::Granite => "smolLM2".to_string(),
-        },
+        model,
         name: agent_type.name().to_string(),
         system_prompt: agent_type.system_prompt().to_string(),
     };
@@ -161,12 +187,7 @@ fn create_default_config_from_cli(args: &cli::Args) -> config::OxideConfig {
             auth_token: args.mcp_auth_token.clone(),
             tools: vec![],
         },
-        llm: config::LLMConfig {
-            provider: "ollama".to_string(),
-            api_base: None,
-            api_key: None,
-            model: None,
-        },
+        llm: llm_config.clone(),
     }
 }
 
@@ -175,6 +196,7 @@ fn merge_configs(
     config_from_file: Option<config::OxideConfig>,
     mut base_config: config::OxideConfig,
     args: &cli::Args,
+    available_models: &[String],
 ) -> config::OxideConfig {
     match config_from_file {
         Some(file_config) => {
@@ -187,11 +209,7 @@ fn merge_configs(
                     cli::AgentType::Llama => config::AgentType::Llama,
                     cli::AgentType::Granite => config::AgentType::Granite,
                 };
-                base_config.agent.model = match agent_type {
-                    cli::AgentType::Qwen => "qwen3:4b".to_string(),
-                    cli::AgentType::Llama => "llama3.2".to_string(),
-                    cli::AgentType::Granite => "smolLM2".to_string(),
-                };
+                base_config.agent.model = agent_type.model(available_models).to_string();
                 base_config.agent.name = agent_type.name().to_string();
                 base_config.agent.system_prompt = agent_type.system_prompt().to_string();
             } else {
@@ -253,10 +271,11 @@ fn create_interface(
     tx: mpsc::Sender<AppEvent>,
     session_name: String,
     session_history: Vec<ChatMessage>,
+    available_models: Vec<String>,
 ) -> anyhow::Result<Box<dyn Interface>> {
     match interface_type {
         config::InterfaceType::Tui => {
-            let tui = Tui::new(rx, tx, session_name, session_history)?;
+            let tui = Tui::new(rx, tx, session_name, session_history, available_models)?;
             Ok(Box::new(tui))
         }
     }

@@ -5,6 +5,7 @@ use OxideAgent::core::agents::Agent;
 use OxideAgent::core::orchestrator::Orchestrator;
 use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[test]
@@ -43,6 +44,12 @@ fn test_orchestrator_new() {
         config.no_stream,
         tx,
         rx,
+        Arc::new(vec![
+            "qwen:latest".to_string(),
+            "llama3:latest".to_string(),
+            "granite:latest".to_string(),
+        ]),
+        config.llm.clone(),
     );
 
     // After initialization and loading state, the session history should be empty
@@ -88,6 +95,12 @@ fn test_orchestrator_get_session_history() {
         config.no_stream,
         tx,
         rx,
+        Arc::new(vec![
+            "qwen:latest".to_string(),
+            "llama3:latest".to_string(),
+            "granite:latest".to_string(),
+        ]),
+        config.llm.clone(),
     );
 
     let history = orchestrator.get_session_history();
@@ -132,6 +145,12 @@ fn test_orchestrator_load_state_empty() {
         config.no_stream,
         tx,
         rx,
+        Arc::new(vec![
+            "qwen:latest".to_string(),
+            "llama3:latest".to_string(),
+            "granite:latest".to_string(),
+        ]),
+        config.llm.clone(),
     );
 
     let result = orchestrator.load_state();
@@ -151,7 +170,7 @@ fn create_test_config() -> Config {
     Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -166,7 +185,7 @@ fn create_test_config() -> Config {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: String::new(),
             api_key: None,
             model: None,
         },

@@ -33,6 +33,15 @@ pub struct Args {
         help = "Path to a configuration file (JSON, YAML, or TOML format)"
     )]
     pub config: Option<String>,
+
+    #[arg(long, help = "The base URL for the LLM API")]
+    pub llm_api_base: Option<String>,
+
+    #[arg(long, help = "The API key for the LLM API")]
+    pub llm_api_key: Option<String>,
+
+    #[arg(long, help = "The model to use for the LLM")]
+    pub llm_model: Option<String>,
 }
 
 #[derive(ValueEnum, Debug, Clone, PartialEq)]
@@ -49,12 +58,18 @@ pub enum InterfaceType {
 }
 
 impl AgentType {
-    pub fn model(&self) -> &'static str {
-        match self {
-            AgentType::Qwen => "qwen3:4b",
-            AgentType::Llama => "llama3.2",
-            AgentType::Granite => "smolLM2",
-        }
+    pub fn model<'a>(&self, available_models: &'a [String]) -> &'a str {
+        let model_name = match self {
+            AgentType::Qwen => "qwen",
+            AgentType::Llama => "llama",
+            AgentType::Granite => "granite",
+        };
+
+        available_models
+            .iter()
+            .find(|m| m.contains(model_name))
+            .map(|m| m.as_str())
+            .unwrap_or_else(|| available_models.first().map(|m| m.as_str()).unwrap_or(""))
     }
 
     pub fn name(&self) -> &'static str {

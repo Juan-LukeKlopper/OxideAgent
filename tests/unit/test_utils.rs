@@ -123,7 +123,7 @@ fn test_create_test_config() {
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen3:4b".to_string(),
+            model: "qwen:latest".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -138,13 +138,13 @@ fn test_create_test_config() {
         },
         llm: OxideAgent::config::LLMConfig {
             provider: "ollama".to_string(),
-            api_base: None,
+            api_base: "http://localhost:11434".to_string(),
             api_key: None,
             model: None,
         },
     };
 
     assert_eq!(config.agent.name, "Qwen");
-    assert_eq!(config.agent.model, "qwen3:4b");
+    assert_eq!(config.agent.model, "qwen:latest");
     assert_eq!(config.session, Some("test_session".to_string()));
 }

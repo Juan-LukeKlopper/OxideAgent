@@ -51,6 +51,7 @@ impl Agent {
         tools: &[Tool],
         stream: bool,
         tx: mpsc::Sender<AppEvent>,
+        api_base: &str,
     ) -> anyhow::Result<Option<ChatMessage>> {
         info!("=== AGENT CHAT START ===");
         info!("Agent model: {}", self.model);
@@ -66,7 +67,16 @@ impl Agent {
         }
         info!("Streaming: {}", stream);
 
-        let response = send_chat(client, &self.model, &self.history, tools, stream, tx).await?;
+        let response = send_chat(
+            client,
+            &self.model,
+            &self.history,
+            tools,
+            stream,
+            tx,
+            api_base,
+        )
+        .await?;
 
         if let Some(message) = response.clone() {
             self.add_assistant_message(message.clone());
