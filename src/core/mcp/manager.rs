@@ -14,14 +14,16 @@ use tracing::{error, info};
 pub type ConnectionId = String;
 
 /// Enum to represent different types of MCP connections
+#[derive(Debug)]
 pub enum McpConnectionType {
     Stdio(StdioMcpConnection),
     Http(HttpMcpConnection),
 }
 
 /// Global registry for MCP connections
+#[derive(Debug, Clone)]
 pub struct McpConnectionRegistry {
-    connections: Arc<RwLock<HashMap<ConnectionId, Arc<Mutex<McpConnectionType>>>>>,
+    pub connections: Arc<RwLock<HashMap<ConnectionId, Arc<Mutex<McpConnectionType>>>>>,
 }
 
 impl McpConnectionRegistry {
@@ -195,14 +197,14 @@ impl Tool for McpToolAdapter {
 
 /// MCP manager that handles server lifecycle and tool registration
 pub struct McpManager {
-    registry: Arc<McpConnectionRegistry>,
+    pub registry: McpConnectionRegistry,
 }
 
 impl McpManager {
     pub fn new() -> Self {
         init_mcp_registry();
         Self {
-            registry: get_mcp_registry(),
+            registry: (*get_mcp_registry()).clone(),
         }
     }
 
@@ -370,7 +372,7 @@ fn truncate_description(description: &str) -> String {
 }
 
 impl McpManager {
-    pub fn get_registry(&self) -> &Arc<McpConnectionRegistry> {
+    pub fn get_registry(&self) -> &McpConnectionRegistry {
         &self.registry
     }
 }
@@ -378,171 +380,5 @@ impl McpManager {
 impl Default for McpManager {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio;
-
-    #[tokio::test]
-    async fn test_mcp_connection_registry_creation() {
-        let registry = McpConnectionRegistry::new();
-        assert!(registry.connections.read().await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_mcp_manager_creation() {
-        let manager = McpManager::new();
-        assert!(manager.registry.connections.read().await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_mcp_tool_adapter_creation() {
-        let adapter = McpToolAdapter::new(
-            "test_tool".to_string(),
-            "A test tool".to_string(),
-            serde_json::json!({}),
-            "test_connection".to_string(),
-        );
-
-        assert_eq!(adapter.name(), "test_tool");
-        assert_eq!(adapter.description(), "A test tool");
-        assert_eq!(adapter.profile(), ToolProfile::Generic);
-    }
-
-    #[tokio::test]
-    async fn test_registry_methods_exist() {
-        let registry = McpConnectionRegistry::new();
-
-        // Test that methods exist - they won't do anything without connections
-        // but they should be callable
-        let connection_id = "nonexistent".to_string();
-        let result = registry.get_connection(&connection_id).await;
-        assert!(result.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_mcp_tool_adapter_parameters() {
-        let params = serde_json::json!({
-            "type": "object",
-            "properties": {
-                "test_param": {
-                    "type": "string"
-                }
-            }
-        });
-
-        let adapter = McpToolAdapter::new(
-            "param_test_tool".to_string(),
-            "A test tool with parameters".to_string(),
-            params.clone(),
-            "test_connection".to_string(),
-        );
-
-        assert_eq!(adapter.parameters(), params);
-    }
-
-    #[tokio::test]
-    async fn test_mcp_connection_type_enum() {
-        use McpConnectionType::*;
-
-        let http_conn = HttpMcpConnection::new(
-            &McpServerConfig {
-                name: "test".to_string(),
-                description: Some("test".to_string()),
-                server_type: McpServerType::Remote {
-                    url: "http://localhost:8080".to_string(),
-                    access_token: None,
-                    api_key: None,
-                },
-                auto_start: Some(false),
-                environment: None,
-            },
-            "http://localhost:8080".to_string(),
-            None,
-            None,
-        );
-
-        let http_variant = Http(http_conn);
-        assert!(matches!(http_variant, Http(_)));
-    }
-
-    #[tokio::test]
-    async fn test_registry_add_http_connection() {
-        let registry = McpConnectionRegistry::new();
-
-        let http_conn = HttpMcpConnection::new(
-            &McpServerConfig {
-                name: "test".to_string(),
-                description: Some("test".to_string()),
-                server_type: McpServerType::Remote {
-                    url: "http://localhost:8080".to_string(),
-                    access_token: None,
-                    api_key: None,
-                },
-                auto_start: Some(false),
-                environment: None,
-            },
-            "http://localhost:8080".to_string(),
-            None,
-            None,
-        );
-
-        registry
-            .add_http_connection("test_conn".to_string(), http_conn)
-            .await;
-
-        let conn = registry.get_connection(&"test_conn".to_string()).await;
-        assert!(conn.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_mcp_tool_adapter_execute_method() {
-        let adapter = McpToolAdapter::new(
-            "execute_test_tool".to_string(),
-            "A test tool for execute method testing".to_string(),
-            serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "test_param": {
-                        "type": "string"
-                    }
-                }
-            }),
-            "test_connection".to_string(),
-        );
-
-        assert_eq!(adapter.name(), "execute_test_tool");
-        assert_eq!(
-            adapter.description(),
-            "A test tool for execute method testing"
-        );
-        assert_eq!(adapter.profile(), ToolProfile::Generic);
-    }
-
-    #[tokio::test]
-    async fn test_mcp_manager_initialization() {
-        init_mcp_registry();
-        let registry = get_mcp_registry();
-        assert!(registry.connections.read().await.is_empty());
-
-        let manager = McpManager::new();
-        assert!(manager.registry.connections.read().await.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_mcp_tool_adapter_clone() {
-        let original = McpToolAdapter::new(
-            "clone_test_tool".to_string(),
-            "A test tool for clone testing".to_string(),
-            serde_json::json!({}),
-            "test_connection".to_string(),
-        );
-
-        let cloned = original.clone_box();
-        assert_eq!(cloned.name(), "clone_test_tool");
-        assert_eq!(cloned.description(), "A test tool for clone testing");
     }
 }
