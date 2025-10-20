@@ -84,7 +84,9 @@ jobs:
     - name: Install cargo-deny
       run: |
         # Use a version that supports 2024 edition
-        cargo install cargo-deny --version ">=0.16.2"
+        if ! command -v cargo-deny &> /dev/null; then
+          cargo install cargo-deny --version ">=0.16.2"
+        fi
         
     - name: Run cargo deny
       run: |
