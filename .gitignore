@@ -9,3 +9,4 @@ bin/*
 sample_config*
 test_config*
 DOCS/*
+oxideagent.log

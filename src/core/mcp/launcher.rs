@@ -601,7 +601,7 @@ impl McpLauncher {
 
     #[allow(dead_code)]
     /// Check if Docker is available on the system
-    async fn check_docker_availability() -> Result<()> {
+    pub async fn check_docker_availability() -> Result<()> {
         let output = Command::new("docker")
             .arg("--version")
             .output()
@@ -616,7 +616,7 @@ impl McpLauncher {
 
     #[allow(dead_code)]
     /// Check if npx is available on the system
-    async fn check_npx_availability() -> Result<()> {
+    pub async fn check_npx_availability() -> Result<()> {
         let output = Command::new("npx")
             .arg("--version")
             .output()
@@ -631,7 +631,7 @@ impl McpLauncher {
 
     #[allow(dead_code)]
     /// Check if uvx is available on the system
-    async fn check_uvx_availability() -> Result<()> {
+    pub async fn check_uvx_availability() -> Result<()> {
         let output = Command::new("uvx")
             .arg("--version")
             .output()
