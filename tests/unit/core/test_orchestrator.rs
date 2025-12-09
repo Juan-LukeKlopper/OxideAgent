@@ -1,11 +1,9 @@
 //! Unit tests for the orchestrator module using mock objects.
 
 use OxideAgent::config::{AgentConfig, AgentType, InterfaceType, OxideConfig as Config};
-use OxideAgent::core::agents::Agent;
 use OxideAgent::core::orchestrator::Orchestrator;
 use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 #[test]
@@ -33,22 +31,19 @@ fn test_orchestrator_new() {
     std::env::set_current_dir(&temp_dir).unwrap();
 
     let config = create_test_config();
-    let agent = Agent::new(&config.agent.name, &config.agent.model);
+    let system_prompt = &config.agent.system_prompt;
+    let model = config.agent.model.clone();
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
 
     let orchestrator = Orchestrator::new(
-        agent,
+        system_prompt,
         tool_registry,
         config.session.clone(),
         config.no_stream,
         tx,
         rx,
-        Arc::new(vec![
-            "qwen:latest".to_string(),
-            "llama3:latest".to_string(),
-            "granite:latest".to_string(),
-        ]),
+        model,
         config.llm.clone(),
     );
 
@@ -84,22 +79,19 @@ fn test_orchestrator_get_session_history() {
     std::env::set_current_dir(&temp_dir).unwrap();
 
     let config = create_test_config();
-    let agent = Agent::new(&config.agent.name, &config.agent.model);
+    let system_prompt = &config.agent.system_prompt;
+    let model = config.agent.model.clone();
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
 
     let orchestrator = Orchestrator::new(
-        agent,
+        system_prompt,
         tool_registry,
         config.session.clone(),
         config.no_stream,
         tx,
         rx,
-        Arc::new(vec![
-            "qwen:latest".to_string(),
-            "llama3:latest".to_string(),
-            "granite:latest".to_string(),
-        ]),
+        model,
         config.llm.clone(),
     );
 
@@ -134,22 +126,19 @@ fn test_orchestrator_load_state_empty() {
     std::env::set_current_dir(&temp_dir).unwrap();
 
     let config = create_test_config();
-    let agent = Agent::new(&config.agent.name, &config.agent.model);
+    let system_prompt = &config.agent.system_prompt;
+    let model = config.agent.model.clone();
     let tool_registry = ToolRegistry::new();
     let (tx, rx) = mpsc::channel::<AppEvent>(32);
 
     let mut orchestrator = Orchestrator::new(
-        agent,
+        system_prompt,
         tool_registry,
         config.session.clone(),
         config.no_stream,
         tx,
         rx,
-        Arc::new(vec![
-            "qwen:latest".to_string(),
-            "llama3:latest".to_string(),
-            "granite:latest".to_string(),
-        ]),
+        model,
         config.llm.clone(),
     );
 
@@ -170,7 +159,7 @@ fn create_test_config() -> Config {
     Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen:latest".to_string(),
+            model: "qwen3:4b".to_string(), // Updated to match default
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -187,7 +176,7 @@ fn create_test_config() -> Config {
             provider: "ollama".to_string(),
             api_base: String::new(),
             api_key: None,
-            model: None,
+            model: Some("qwen3:4b".to_string()),
         },
     }
 }
