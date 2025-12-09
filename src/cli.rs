@@ -58,20 +58,6 @@ pub enum InterfaceType {
 }
 
 impl AgentType {
-    pub fn model<'a>(&self, available_models: &'a [String]) -> &'a str {
-        let model_name = match self {
-            AgentType::Qwen => "qwen",
-            AgentType::Llama => "llama",
-            AgentType::Granite => "granite",
-        };
-
-        available_models
-            .iter()
-            .find(|m| m.contains(model_name))
-            .map(|m| m.as_str())
-            .unwrap_or_else(|| available_models.first().map(|m| m.as_str()).unwrap_or(""))
-    }
-
     pub fn name(&self) -> &'static str {
         match self {
             AgentType::Qwen => "Qwen",
@@ -85,6 +71,15 @@ impl AgentType {
             AgentType::Qwen => "You are a Rust programming expert.",
             AgentType::Llama => "You are a helpful assistant.",
             AgentType::Granite => "You are a helpful assistant.",
+        }
+    }
+
+    #[allow(dead_code)] // Keep for future use or external API
+    pub fn model_keyword(&self) -> &'static str {
+        match self {
+            AgentType::Qwen => "qwen",
+            AgentType::Llama => "llama",
+            AgentType::Granite => "granite",
         }
     }
 }
