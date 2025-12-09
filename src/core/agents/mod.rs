@@ -23,17 +23,13 @@ impl std::fmt::Display for AgentId {
 
 #[derive(Debug, Clone)]
 pub struct Agent {
-    pub model: String,
     pub history: Vec<ChatMessage>,
 }
 
 impl Agent {
-    pub fn new(_name: &str, model: &str) -> Self {
-        let system_message = "You are a helpful assistant. You have access to tools that can help you perform various tasks. Use them when appropriate.";
-
+    pub fn new(system_prompt: &str) -> Self {
         Self {
-            model: model.to_string(),
-            history: vec![ChatMessage::system(system_message)],
+            history: vec![ChatMessage::system(system_prompt)],
         }
     }
 
@@ -45,16 +41,28 @@ impl Agent {
         self.history.push(message);
     }
 
+    pub fn update_system_prompt(&mut self, new_system_prompt: &str) {
+        // Remove the old system prompt (first message if it's a system message)
+        if !self.history.is_empty() && self.history[0].role == "system" {
+            self.history[0] = ChatMessage::system(new_system_prompt);
+        } else {
+            // If there's no system message at the start, insert it
+            self.history
+                .insert(0, ChatMessage::system(new_system_prompt));
+        }
+    }
+
     pub async fn chat(
         &mut self,
         client: &Client,
+        model: &str,
         tools: &[Tool],
         stream: bool,
         tx: mpsc::Sender<AppEvent>,
         api_base: &str,
     ) -> anyhow::Result<Option<ChatMessage>> {
         info!("=== AGENT CHAT START ===");
-        info!("Agent model: {}", self.model);
+        info!("Agent model: {}", model);
         info!("History contains {} messages", self.history.len());
         info!("Sending {} tools to Ollama", tools.len());
         for (i, tool) in tools.iter().enumerate() {
@@ -67,16 +75,7 @@ impl Agent {
         }
         info!("Streaming: {}", stream);
 
-        let response = send_chat(
-            client,
-            &self.model,
-            &self.history,
-            tools,
-            stream,
-            tx,
-            api_base,
-        )
-        .await?;
+        let response = send_chat(client, model, &self.history, tools, stream, tx, api_base).await?;
 
         if let Some(message) = response.clone() {
             self.add_assistant_message(message.clone());
