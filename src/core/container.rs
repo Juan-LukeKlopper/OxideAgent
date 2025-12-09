@@ -21,18 +21,16 @@ pub struct Container {
     tool_registry: Option<ToolRegistry>,
     #[allow(dead_code)]
     session_manager: Option<SessionManager>,
-    pub available_models: Arc<Vec<String>>,
 }
 
 impl Container {
     /// Create a new container with the given configuration
-    pub fn new(config: OxideConfig, available_models: Vec<String>) -> Self {
+    pub fn new(config: OxideConfig) -> Self {
         Self {
             config: Arc::new(config),
             agent: None,
             tool_registry: None,
             session_manager: None,
-            available_models: Arc::new(available_models),
         }
     }
 
@@ -50,7 +48,7 @@ impl Container {
     /// Build the agent
     pub fn build_agent(&mut self) -> Result<&mut Agent> {
         if self.agent.is_none() {
-            let agent = Agent::new(&self.config.agent.name, &self.config.agent.model);
+            let agent = Agent::new(&self.config.agent.system_prompt);
             self.agent = Some(agent);
         }
         Ok(self.agent.as_mut().unwrap())
@@ -121,25 +119,22 @@ impl Container {
         // Store configuration values to avoid borrowing issues
         let session_name = self.config.session.clone();
         let no_stream = self.config.no_stream;
-        let agent_name = self.config.agent.name.clone();
-        let agent_model = self.config.agent.model.clone();
+        let system_prompt = self.config.agent.system_prompt.clone();
+        let model = self.config.agent.model.clone();
         let llm_config = self.config.llm.clone();
 
         // Build dependencies (we call these to ensure they're initialized)
         let _agent = self.build_agent()?;
         let tool_registry = self.build_tool_registry().await?;
 
-        // Create new instance for the orchestrator with the same configuration
-        let agent_instance = Agent::new(&agent_name, &agent_model);
-
         Ok(Orchestrator::new(
-            agent_instance,
+            &system_prompt,
             tool_registry.clone_registry(),
             session_name,
             no_stream,
             orchestrator_tx,
             orchestrator_rx,
-            self.available_models.clone(),
+            model,
             llm_config,
         ))
     }
