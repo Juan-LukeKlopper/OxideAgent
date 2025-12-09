@@ -33,6 +33,7 @@ pub enum EventType {
     /// Session management events
     SwitchSession(String),
     SwitchAgent(String),
+    SwitchModel(String),
     ListSessions,
     RefreshSessions,
     SessionList(Vec<String>),
@@ -132,6 +133,7 @@ impl EventBus {
             AppEvent::Error(error) => EventType::Error(error),
             AppEvent::SwitchSession(session) => EventType::SwitchSession(session),
             AppEvent::SwitchAgent(agent) => EventType::SwitchAgent(agent),
+            AppEvent::SwitchModel(model) => EventType::SwitchModel(model),
             AppEvent::ListSessions => EventType::ListSessions,
             AppEvent::RefreshSessions => EventType::RefreshSessions,
             AppEvent::SessionList(sessions) => EventType::SessionList(sessions),

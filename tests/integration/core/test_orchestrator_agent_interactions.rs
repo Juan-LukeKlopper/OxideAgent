@@ -11,11 +11,7 @@ use tokio::sync::mpsc;
 #[tokio::test]
 #[allow(unused_variables, unused_mut)]
 async fn test_tool_execution_workflow() {
-    let available_models = vec![
-        "qwen:latest".to_string(),
-        "llama3:latest".to_string(),
-        "granite:latest".to_string(),
-    ];
+    // Available models list - currently unused but may be needed in future expansions
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
@@ -41,7 +37,7 @@ async fn test_tool_execution_workflow() {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config, available_models.clone());
+    let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
@@ -61,11 +57,7 @@ async fn test_tool_execution_workflow() {
 
 #[tokio::test]
 async fn test_orchestrator_session_switching() {
-    let available_models = vec![
-        "qwen:latest".to_string(),
-        "llama3:latest".to_string(),
-        "granite:latest".to_string(),
-    ];
+    // Available models list - currently unused but may be needed in future expansions
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
@@ -95,7 +87,7 @@ async fn test_orchestrator_session_switching() {
     let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config, available_models.clone());
+    let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
@@ -120,11 +112,7 @@ async fn test_orchestrator_session_switching() {
 #[tokio::test]
 #[allow(unused_variables, unused_mut)]
 async fn test_orchestrator_tool_approvals() {
-    let available_models = vec![
-        "qwen:latest".to_string(),
-        "llama3:latest".to_string(),
-        "granite:latest".to_string(),
-    ];
+    // Available models list - currently unused but may be needed in future expansions
     // Create a temporary session to avoid conflicts with other tests
     let temp_session_name = "temp_tool_approval_test";
     let session_file = format!("session_{}.json", temp_session_name);
@@ -161,7 +149,7 @@ async fn test_orchestrator_tool_approvals() {
     let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config, available_models.clone());
+    let mut container = Container::new(config);
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await

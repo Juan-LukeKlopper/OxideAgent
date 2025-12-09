@@ -31,6 +31,7 @@ use message::Message;
 enum SwitcherSelection {
     Agent(usize),   // Index of selected agent
     Session(usize), // Index of selected session
+    Model(usize),   // Index of selected model
 }
 
 pub struct Tui {
@@ -46,6 +47,8 @@ pub struct Tui {
     show_switcher_overlay: bool,
     current_agent: String,
     available_agents: Vec<String>,
+    current_model: String,
+    available_models: Vec<String>,
     // Track message positions for click detection
     message_positions: Vec<(usize, Rect)>, // (message_index, area)
     session_name: String,
@@ -61,6 +64,8 @@ impl Tui {
         tx: mpsc::Sender<AppEvent>,
         session_name: String,
         session_history: Vec<ChatMessage>,
+        available_agents: Vec<String>,
+        current_model: String,
         available_models: Vec<String>,
     ) -> anyhow::Result<Self> {
         let mut stdout = io::stdout();
@@ -90,7 +95,9 @@ impl Tui {
             show_status_overlay: false,
             show_switcher_overlay: false,
             current_agent: session_name.clone(),
-            available_agents: available_models,
+            available_agents,
+            current_model,
+            available_models,
             message_positions: Vec::new(),
             session_name,
             // Initialize switcher selection state
@@ -156,6 +163,8 @@ impl Tui {
                     self.show_switcher_overlay,
                     &self.current_agent,
                     &self.available_agents,
+                    &self.current_model,
+                    &self.available_models,
                     self.switcher_selection,
                     &self.available_sessions,
                     self.switcher_scroll,
@@ -296,6 +305,15 @@ impl Tui {
                     false,
                 ));
             }
+            AppEvent::SwitchModel(model_name) => {
+                // Update the current model name
+                self.current_model = model_name.clone();
+                // Add a message to indicate the model switch
+                self.messages.push(Message::ToolOutput(
+                    format!("Switched to model: {}", model_name),
+                    false,
+                ));
+            }
             AppEvent::RefreshSessions => {
                 // This event is sent to the orchestrator, not handled here
             }
@@ -403,6 +421,10 @@ impl Tui {
                         let session_name = stripped.trim().to_string();
                         self.tx.send(AppEvent::SwitchSession(session_name)).await?;
                         self.messages.push(Message::User(user_input.clone()));
+                    } else if let Some(stripped) = user_input.strip_prefix("/model ") {
+                        let model_name = stripped.trim().to_string();
+                        self.tx.send(AppEvent::SwitchModel(model_name)).await?;
+                        self.messages.push(Message::User(user_input.clone()));
                     } else {
                         self.messages.push(Message::User(user_input.clone()));
                         self.tx.send(AppEvent::UserInput(user_input)).await?;
@@ -428,9 +450,11 @@ impl Tui {
                     }
                 } else {
                     self.switcher_selection =
-                        SwitcherSelection::Session(self.available_sessions.len().saturating_sub(1));
-                    self.switcher_scroll =
-                        self.available_agents.len() + self.available_sessions.len() + 1;
+                        SwitcherSelection::Model(self.available_models.len().saturating_sub(1));
+                    self.switcher_scroll = self.available_agents.len()
+                        + self.available_sessions.len()
+                        + self.available_models.len()
+                        + 2;
                 }
             }
             SwitcherSelection::Session(idx) => {
@@ -443,6 +467,23 @@ impl Tui {
                     self.switcher_selection =
                         SwitcherSelection::Agent(self.available_agents.len().saturating_sub(1));
                     self.switcher_scroll = self.available_agents.len() - 1;
+                }
+            }
+            SwitcherSelection::Model(idx) => {
+                if idx > 0 {
+                    self.switcher_selection = SwitcherSelection::Model(idx - 1);
+                    if self.available_agents.len() + self.available_sessions.len() + 2 + idx - 1
+                        < self.switcher_scroll
+                    {
+                        self.switcher_scroll =
+                            self.available_agents.len() + self.available_sessions.len() + 2 + idx
+                                - 1;
+                    }
+                } else {
+                    self.switcher_selection =
+                        SwitcherSelection::Session(self.available_sessions.len().saturating_sub(1));
+                    self.switcher_scroll =
+                        self.available_agents.len() + self.available_sessions.len() + 1;
                 }
             }
         }
@@ -472,6 +513,32 @@ impl Tui {
                     {
                         self.switcher_scroll =
                             self.available_agents.len() + 1 + idx + 1 - panel_height + 1;
+                    }
+                } else {
+                    self.switcher_selection = SwitcherSelection::Model(0);
+                    if self.available_agents.len() + self.available_sessions.len() + 2
+                        >= self.switcher_scroll + panel_height
+                    {
+                        self.switcher_scroll =
+                            self.available_agents.len() + self.available_sessions.len() + 2
+                                - panel_height
+                                + 1;
+                    }
+                }
+            }
+            SwitcherSelection::Model(idx) => {
+                if idx + 1 < self.available_models.len() {
+                    self.switcher_selection = SwitcherSelection::Model(idx + 1);
+                    if self.available_agents.len() + self.available_sessions.len() + 2 + idx + 1
+                        >= self.switcher_scroll + panel_height
+                    {
+                        self.switcher_scroll = self.available_agents.len()
+                            + self.available_sessions.len()
+                            + 2
+                            + idx
+                            + 1
+                            - panel_height
+                            + 1;
                     }
                 } else {
                     self.switcher_selection = SwitcherSelection::Agent(0);
@@ -518,6 +585,19 @@ impl Tui {
                             .await?;
                         self.messages
                             .push(Message::User(format!("/switch {}", selected_session)));
+                    }
+                }
+            }
+            SwitcherSelection::Model(idx) => {
+                if idx < self.available_models.len() {
+                    let selected_model = &self.available_models[idx];
+                    if selected_model != &self.current_model {
+                        // Send switch model event
+                        self.tx
+                            .send(AppEvent::SwitchModel(selected_model.clone()))
+                            .await?;
+                        self.messages
+                            .push(Message::User(format!("/model {}", selected_model)));
                     }
                 }
             }
@@ -783,6 +863,8 @@ fn ui(
     show_switcher_overlay: bool,
     current_agent: &str,
     available_agents: &[String],
+    current_model: &str,
+    available_models: &[String],
     switcher_selection: SwitcherSelection,
     available_sessions: &[String],
     switcher_scroll: usize,
@@ -808,6 +890,8 @@ fn ui(
             chunks[1],
             current_agent,
             available_agents,
+            current_model,
+            available_models,
             session_name,
             available_sessions,
             switcher_selection,
@@ -833,13 +917,15 @@ fn render_switcher_panel(
     area: Rect,
     current_agent: &str,
     available_agents: &[String],
+    current_model: &str,
+    available_models: &[String],
     current_session: &str,
     available_sessions: &[String],
     switcher_selection: SwitcherSelection,
     switcher_scroll: usize,
 ) {
     let block = Block::default()
-        .title("Switch Agent/Session (Press Ctrl+a or Esc to close)")
+        .title("Switch Agent/Session/Model (Press Ctrl+a or Esc to close)")
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::Yellow))
         .style(Style::default().bg(Color::Rgb(20, 20, 35))); // Solid dark background
@@ -848,7 +934,8 @@ fn render_switcher_panel(
     f.render_widget(block, area);
 
     let mut text = String::new();
-    let total_items = available_agents.len() + available_sessions.len() + 2; // +2 for headers
+    let total_items =
+        available_agents.len() + available_sessions.len() + available_models.len() + 3; // +3 for headers
     let panel_height = inner_area.height as usize;
 
     let mut current_line = 0;
@@ -904,6 +991,34 @@ fn render_switcher_panel(
                 text.push_str(&format!("  -> [{}]\n", session));
             } else {
                 text.push_str(&format!("     {}\n", session));
+            }
+        }
+        current_line += 1;
+    }
+
+    // Models
+    if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+        text.push_str("\nAvailable Models:\n");
+    }
+    current_line += 2; // accounts for the blank line
+
+    for (idx, model) in available_models.iter().enumerate() {
+        if current_line >= switcher_scroll && current_line < switcher_scroll + panel_height {
+            let is_selected = match switcher_selection {
+                SwitcherSelection::Model(selected_idx) => selected_idx == idx,
+                _ => false,
+            };
+
+            if model == current_model {
+                if is_selected {
+                    text.push_str(&format!("  -> [{}] (current, selected)\n", model));
+                } else {
+                    text.push_str(&format!("     {} (current)\n", model));
+                }
+            } else if is_selected {
+                text.push_str(&format!("  -> [{}]\n", model));
+            } else {
+                text.push_str(&format!("     {}\n", model));
             }
         }
         current_line += 1;

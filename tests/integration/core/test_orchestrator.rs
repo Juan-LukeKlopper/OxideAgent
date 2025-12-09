@@ -13,19 +13,28 @@ fn test_orchestrator_creation() {
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen:latest".to_string(),
+            model: "qwen3:4b".to_string(),
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
         no_stream: false,
         session: Some("test_session".to_string()),
         list_sessions: false,
-        mcp_server: None,
-        mcp_auth_token: None,
         interface: InterfaceType::Tui,
+        mcp: OxideAgent::config::MCPConfig {
+            server: None,
+            auth_token: None,
+            tools: vec![],
+        },
+        llm: OxideAgent::config::LLMConfig {
+            provider: "ollama".to_string(),
+            api_base: "http://localhost:11434".to_string(),
+            api_key: None,
+            model: None,
+        },
     };
 
-    let mut container = Container::new(config, available_models.clone());
+    let mut container = Container::new(config);
 
     let (orchestrator_tx, _interface_rx) = mpsc::channel::<AppEvent>(32);
     let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
@@ -52,11 +61,11 @@ fn test_tool_registry_creation() {
 
 #[test]
 fn test_agent_creation() {
-    let agent = Agent::new("TestAgent", "test-model");
-    assert_eq!(agent.model, "test-model");
+    let agent = Agent::new("TestAgent");
 
     // Check that the agent has a system message
     assert!(!agent.history.is_empty());
     let system_message = &agent.history[0];
     assert_eq!(system_message.role, "system");
+    assert_eq!(system_message.content, "TestAgent");
 }

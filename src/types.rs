@@ -22,6 +22,7 @@ pub enum AppEvent {
     Error(String),
     SwitchSession(String),            // New event for switching sessions
     SwitchAgent(String),              // New event for switching agents
+    SwitchModel(String),              // New event for switching models
     ListSessions,                     // New event for listing sessions
     RefreshSessions, // New event for refreshing sessions without displaying response
     SessionList(Vec<String>), // New event to send session list to TUI

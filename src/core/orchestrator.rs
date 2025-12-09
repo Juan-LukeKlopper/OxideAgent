@@ -5,7 +5,6 @@ use crate::core::tool_permissions::GlobalToolPermissions;
 use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
 use reqwest::Client;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -20,20 +19,20 @@ pub struct Orchestrator {
     rx: mpsc::Receiver<AppEvent>,
     pending_tool_calls: Option<Vec<ToolCall>>,
     global_permissions: GlobalToolPermissions,
-    available_models: Arc<Vec<String>>,
+    model: String,
     llm_config: LLMConfig,
 }
 
 impl Orchestrator {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        agent: Agent,
+        system_prompt: &str,
         tool_registry: ToolRegistry,
         session_name: Option<String>,
         no_stream: bool,
         tx: mpsc::Sender<AppEvent>,
         rx: mpsc::Receiver<AppEvent>,
-        available_models: Arc<Vec<String>>,
+        model: String,
         llm_config: LLMConfig,
     ) -> Self {
         let session_file = match session_name {
@@ -41,6 +40,7 @@ impl Orchestrator {
             None => "session.json".to_string(),
         };
 
+        let agent = Agent::new(system_prompt);
         let session_state = SessionState::new();
         let global_permissions = GlobalToolPermissions::load().unwrap_or_default();
 
@@ -55,7 +55,7 @@ impl Orchestrator {
             rx,
             pending_tool_calls: None,
             global_permissions,
-            available_models,
+            model,
             llm_config,
         }
     }
@@ -67,6 +67,13 @@ impl Orchestrator {
     pub fn load_state(&mut self) -> anyhow::Result<()> {
         match SessionManager::load_state(&self.session_file)? {
             Some(session_state) => {
+                // Set the agent's history from the session
+                self.agent.history = session_state.history().clone();
+
+                // Set the model from the session (if it exists in the session)
+                self.model = session_state.model().to_string();
+
+                // Save the session state (now with the model updated)
                 self.session_state = session_state;
             }
             None => {
@@ -80,6 +87,7 @@ impl Orchestrator {
     fn save_state(&mut self) -> anyhow::Result<()> {
         let mut session_state = self.session_state.clone();
         session_state.set_history(self.agent.history.clone());
+        session_state.set_model(self.model.clone()); // Save the current model to the session
         SessionManager::save_state(&self.session_file, &session_state)?;
         Ok(())
     }
@@ -95,7 +103,7 @@ impl Orchestrator {
         self.agent.history.clear();
         self.session_state = SessionState::new();
 
-        // Load new session
+        // Load new session (which will set the history and model from the session)
         self.load_state()?;
 
         Ok(())
@@ -156,20 +164,24 @@ impl Orchestrator {
                         }
                     };
 
-                    // Create new agent
-                    let new_agent = crate::core::agents::Agent::new(
-                        agent_type.name(),
-                        agent_type.model(&self.available_models),
-                    );
-
-                    // Replace the current agent
-                    self.agent = new_agent;
+                    // Update only the system prompt of the agent, keeping the same agent instance
+                    // This ensures we maintain the same agent but with a different system prompt
+                    self.agent.update_system_prompt(agent_type.system_prompt());
 
                     // Notify TUI that agent has been switched
                     self.tx
                         .send(AppEvent::AgentMessage(format!(
                             "Switched to agent: {}",
                             agent_name
+                        )))
+                        .await?;
+                }
+                AppEvent::SwitchModel(model_name) => {
+                    self.model = model_name.clone();
+                    self.tx
+                        .send(AppEvent::AgentMessage(format!(
+                            "Switched to model: {}",
+                            model_name
                         )))
                         .await?;
                 }
@@ -325,11 +337,15 @@ impl Orchestrator {
             );
         }
 
-        info!("Sending chat request to agent...");
+        info!(
+            "Sending chat request to agent with model: {}...",
+            &self.model
+        );
         let response = self
             .agent
             .chat(
                 &self.client,
+                &self.model,
                 &tool_definitions,
                 !self.no_stream,
                 self.tx.clone(),

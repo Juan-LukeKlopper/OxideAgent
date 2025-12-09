@@ -14,6 +14,15 @@ pub struct SessionState {
     /// Tools that are allowed for this specific session
     #[serde(default)] // Add default to handle missing field in existing files
     allowed_tools: Vec<String>,
+    /// The model used for this session
+    #[serde(default = "default_model")]
+    // Add default to handle missing field in existing files
+    model: String,
+}
+
+/// Default model function for deserialization
+fn default_model() -> String {
+    "qwen3:4b".to_string()
 }
 
 #[allow(dead_code)] // Methods are used in tests and form part of the public API
@@ -22,6 +31,7 @@ impl SessionState {
         Self {
             history: Vec::new(),
             allowed_tools: Vec::new(), // Explicitly initialize as empty
+            model: default_model(),    // Initialize with default model
         }
     }
 
@@ -55,6 +65,16 @@ impl SessionState {
     /// List all tools allowed for this session
     pub fn list_allowed_tools(&self) -> Vec<String> {
         self.allowed_tools.clone()
+    }
+
+    /// Get the model for this session
+    pub fn model(&self) -> &str {
+        &self.model
+    }
+
+    /// Set the model for this session
+    pub fn set_model(&mut self, model: String) {
+        self.model = model;
     }
 }
 

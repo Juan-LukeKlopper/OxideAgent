@@ -26,11 +26,6 @@ async fn test_tool_execution_workflow() {
         // Just ensure any setup is done while holding the lock, but don't do async work
     }
 
-    let available_models = vec![
-        "qwen:latest".to_string(),
-        "llama3:latest".to_string(),
-        "granite:latest".to_string(),
-    ];
     // Test full tool execution workflow
     let config = Config {
         agent: AgentConfig {
@@ -61,7 +56,7 @@ async fn test_tool_execution_workflow() {
     let (_interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
 
     // Create and build the orchestrator
-    let mut container = Container::new(config, available_models.clone());
+    let mut container = Container::new(config);
     let orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await
