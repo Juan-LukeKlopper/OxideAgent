@@ -5,21 +5,16 @@ use OxideAgent::types::ChatMessage;
 
 #[test]
 fn test_agent_new() {
-    let agent = Agent::new("TestAgent", "test-model");
+    let agent = Agent::new("You are a helpful assistant.");
 
-    assert_eq!(agent.model, "test-model");
     assert_eq!(agent.history.len(), 1); // System message
     assert_eq!(agent.history[0].role, "system");
-    assert!(
-        agent.history[0]
-            .content
-            .contains("You are a helpful assistant")
-    );
+    assert_eq!(agent.history[0].content, "You are a helpful assistant.");
 }
 
 #[test]
 fn test_agent_add_user_message() {
-    let mut agent = Agent::new("TestAgent", "test-model");
+    let mut agent = Agent::new("You are a helpful assistant.");
 
     agent.add_user_message("Hello, world!");
 
@@ -30,7 +25,7 @@ fn test_agent_add_user_message() {
 
 #[test]
 fn test_agent_add_assistant_message() {
-    let mut agent = Agent::new("TestAgent", "test-model");
+    let mut agent = Agent::new("You are a helpful assistant.");
 
     let assistant_message = ChatMessage::assistant("Hello, user!");
     agent.add_assistant_message(assistant_message);
@@ -38,6 +33,21 @@ fn test_agent_add_assistant_message() {
     assert_eq!(agent.history.len(), 2);
     assert_eq!(agent.history[1].role, "assistant");
     assert_eq!(agent.history[1].content, "Hello, user!");
+}
+
+#[test]
+fn test_agent_update_system_prompt() {
+    let mut agent = Agent::new("You are a helpful assistant.");
+
+    // Initially has system message
+    assert_eq!(agent.history[0].content, "You are a helpful assistant.");
+
+    // Update system prompt
+    agent.update_system_prompt("You are a Rust programming expert.");
+    assert_eq!(
+        agent.history[0].content,
+        "You are a Rust programming expert."
+    );
 }
 
 #[test]
@@ -54,7 +64,7 @@ fn test_agent_id_debug() {
 
 #[test]
 fn test_agent_history_modifications() {
-    let mut agent = Agent::new("TestAgent", "test-model");
+    let mut agent = Agent::new("You are a helpful assistant.");
 
     // Initially has system message
     assert_eq!(agent.history.len(), 1);
@@ -73,16 +83,4 @@ fn test_agent_history_modifications() {
     agent.add_user_message("Second message");
     assert_eq!(agent.history.len(), 4);
     assert_eq!(agent.history[3].content, "Second message");
-}
-
-#[test]
-fn test_agent_different_models() {
-    let agent1 = Agent::new("TestAgent1", "model1");
-    let agent2 = Agent::new("TestAgent2", "model2");
-
-    assert_eq!(agent1.model, "model1");
-    assert_eq!(agent2.model, "model2");
-
-    // Both should have the same initial system message
-    assert_eq!(agent1.history[0].content, agent2.history[0].content);
 }
