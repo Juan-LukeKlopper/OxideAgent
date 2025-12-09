@@ -109,13 +109,13 @@ async fn test_mock_tool_failure() {
 
 #[test]
 fn test_create_mock_agent() {
-    let agent = OxideAgent::core::agents::Agent::new("MockAgent", "mock-model");
-    assert_eq!(agent.model, "mock-model");
+    let agent = OxideAgent::core::agents::Agent::new("MockAgent");
 
     // Check that the agent has a system message
     assert!(!agent.history.is_empty());
     let system_message = &agent.history[0];
     assert_eq!(system_message.role, "system");
+    assert_eq!(system_message.content, "MockAgent");
 }
 
 #[test]
@@ -123,7 +123,7 @@ fn test_create_test_config() {
     let config = Config {
         agent: AgentConfig {
             agent_type: AgentType::Qwen,
-            model: "qwen:latest".to_string(),
+            model: "qwen3:4b".to_string(), // Updated to match default
             name: "Qwen".to_string(),
             system_prompt: "You are a test agent.".to_string(),
         },
@@ -140,11 +140,11 @@ fn test_create_test_config() {
             provider: "ollama".to_string(),
             api_base: "http://localhost:11434".to_string(),
             api_key: None,
-            model: None,
+            model: Some("qwen3:4b".to_string()),
         },
     };
 
     assert_eq!(config.agent.name, "Qwen");
-    assert_eq!(config.agent.model, "qwen:latest");
+    assert_eq!(config.agent.model, "qwen3:4b");
     assert_eq!(config.session, Some("test_session".to_string()));
 }

@@ -181,7 +181,7 @@ impl Interface for MockInterface {
 /// Create a mock agent for testing
 #[allow(dead_code)]
 pub fn create_mock_agent() -> Agent {
-    Agent::new("MockAgent", "mock-model")
+    Agent::new("MockAgent")
 }
 
 /// Create a test configuration
