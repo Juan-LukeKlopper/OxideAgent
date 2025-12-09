@@ -60,10 +60,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Create base configuration from CLI arguments with defaults
-    let base_config = create_default_config_from_cli(&args, &available_models, &llm_config);
+    let base_config = create_default_config_from_cli(&args, &[], &llm_config);
 
     // Merge the configurations - CLI args take precedence over config file
-    let config = merge_configs(config_from_file, base_config, &args, &available_models);
+    let config = merge_configs(config_from_file, base_config, &args, &[]);
 
     // Validate the configuration
     config.validate()?;
@@ -89,7 +89,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create the container
-    let mut container = crate::core::container::Container::new(config, available_models.clone());
+    let mut container = crate::core::container::Container::new(config);
 
     // Determine the session name for display
     let session_name = container
@@ -121,12 +121,19 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create the interface (TUI in this case)
+    let available_agents = vec![
+        "Qwen".to_string(),
+        "Llama".to_string(),
+        "Granite".to_string(),
+    ];
     let mut interface = create_interface(
         &container.config().interface,
         interface_rx,
         interface_tx,
         session_name.clone(), // Clone to keep original for logging
         session_history,
+        available_agents,
+        container.config().agent.model.clone(),
         available_models,
     )?;
 
@@ -154,12 +161,12 @@ async fn main() -> anyhow::Result<()> {
 // Create a default configuration based on CLI arguments (with defaults when not specified)
 fn create_default_config_from_cli(
     args: &cli::Args,
-    available_models: &[String],
+    _available_models: &[String],
     llm_config: &config::LLMConfig,
 ) -> config::OxideConfig {
     // Set default agent if not specified in CLI
     let agent_type = args.agent.clone().unwrap_or(cli::AgentType::Qwen);
-    let model = agent_type.model(available_models).to_string();
+    let model = llm_config.model.clone().unwrap_or_default();
 
     let agent_config = config::AgentConfig {
         agent_type: match agent_type {
@@ -196,7 +203,7 @@ fn merge_configs(
     config_from_file: Option<config::OxideConfig>,
     mut base_config: config::OxideConfig,
     args: &cli::Args,
-    available_models: &[String],
+    _available_models: &[String],
 ) -> config::OxideConfig {
     match config_from_file {
         Some(file_config) => {
@@ -209,7 +216,6 @@ fn merge_configs(
                     cli::AgentType::Llama => config::AgentType::Llama,
                     cli::AgentType::Granite => config::AgentType::Granite,
                 };
-                base_config.agent.model = agent_type.model(available_models).to_string();
                 base_config.agent.name = agent_type.name().to_string();
                 base_config.agent.system_prompt = agent_type.system_prompt().to_string();
             } else {
@@ -265,17 +271,28 @@ fn merge_configs(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Interface creation requires all these parameters
 fn create_interface(
     interface_type: &config::InterfaceType,
     rx: mpsc::Receiver<AppEvent>,
     tx: mpsc::Sender<AppEvent>,
     session_name: String,
     session_history: Vec<ChatMessage>,
+    available_agents: Vec<String>,
+    current_model: String,
     available_models: Vec<String>,
 ) -> anyhow::Result<Box<dyn Interface>> {
     match interface_type {
         config::InterfaceType::Tui => {
-            let tui = Tui::new(rx, tx, session_name, session_history, available_models)?;
+            let tui = Tui::new(
+                rx,
+                tx,
+                session_name,
+                session_history,
+                available_agents,
+                current_model,
+                available_models,
+            )?;
             Ok(Box::new(tui))
         }
     }
