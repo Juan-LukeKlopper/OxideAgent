@@ -14,6 +14,10 @@ pub struct OxideConfig {
     #[serde(default)]
     pub agent: AgentConfig,
 
+    /// Multi-agent mode configuration
+    #[serde(default)]
+    pub multi_agent: MultiAgentConfig,
+
     /// MCP (Model Context Protocol) configuration section
     #[serde(default)]
     pub mcp: MCPConfig,
@@ -109,6 +113,22 @@ pub enum InterfaceType {
     // In the future we could add Web, Telegram, etc.
 }
 
+/// Multi-agent mode configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MultiAgentConfig {
+    /// Whether multi-agent mode is enabled
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Max number of concurrent agents
+    #[serde(default = "default_max_agents")]
+    pub max_agents: usize,
+
+    /// Default agents to initialize
+    #[serde(default)]
+    pub default_agents: Vec<AgentConfig>,
+}
+
 /// LLM provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct LLMConfig {
@@ -155,6 +175,10 @@ pub fn default_provider() -> String {
 
 pub fn default_api_base() -> String {
     "http://localhost:11434".to_string()
+}
+
+pub fn default_max_agents() -> usize {
+    5
 }
 
 impl OxideConfig {
