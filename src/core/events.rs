@@ -44,6 +44,7 @@ pub enum EventType {
     Shutdown,
     ConfigChanged,
     ContinueConversation, // New event to continue conversation after tool execution
+    AgentStatusUpdate(String, String), // New event to update agent status (agent_name, status)
 }
 
 /// Event with metadata
@@ -132,7 +133,7 @@ impl EventBus {
             AppEvent::ToolResult(name, result) => EventType::ToolResult(name, result),
             AppEvent::Error(error) => EventType::Error(error),
             AppEvent::SwitchSession(session) => EventType::SwitchSession(session),
-            AppEvent::SwitchAgent(agent) => EventType::SwitchAgent(agent),
+            AppEvent::SwitchAgent(agent, _) => EventType::SwitchAgent(agent),
             AppEvent::SwitchModel(model) => EventType::SwitchModel(model),
             AppEvent::ListSessions => EventType::ListSessions,
             AppEvent::RefreshSessions => EventType::RefreshSessions,
@@ -140,6 +141,9 @@ impl EventBus {
             AppEvent::SessionSwitched(session) => EventType::SessionSwitched(session),
             AppEvent::SessionHistory(history) => EventType::SessionHistory(history),
             AppEvent::ContinueConversation => EventType::ContinueConversation,
+            AppEvent::AgentStatusUpdate(agent_name, status) => {
+                EventType::AgentStatusUpdate(agent_name, status)
+            }
         };
 
         let event = Event::new(event_type, source);
