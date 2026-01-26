@@ -6,6 +6,7 @@ use crate::types::ChatMessage;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use tracing::warn;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SessionState {
@@ -107,12 +108,12 @@ impl SessionManager {
                                 Ok(session_state) => return Ok(Some(session_state)),
                                 Err(e) => {
                                     // Log the error but don't crash
-                                    eprintln!(
-                                        "Warning: Failed to parse session file '{}': {}",
+                                    warn!(
+                                        "Failed to parse session file '{}': {}",
                                         path.display(),
                                         e
                                     );
-                                    eprintln!("Creating new session state as fallback.");
+                                    warn!("Creating new session state as fallback.");
                                     return Ok(Some(SessionState::new()));
                                 }
                             }
@@ -128,8 +129,8 @@ impl SessionManager {
                             std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
                         } else {
                             // Log the error but don't crash
-                            eprintln!(
-                                "Warning: Failed to read session file '{}': {}",
+                            warn!(
+                                "Failed to read session file '{}': {}",
                                 path.display(),
                                 e
                             );
@@ -205,11 +206,15 @@ impl SessionManager {
 
     /// List all available sessions
     pub fn list_sessions() -> anyhow::Result<Vec<String>> {
-        let mut sessions = std::collections::HashSet::new();
+        let mut sessions = Vec::new();
 
         // Check for the default session file
         if Path::new("session.json").exists() {
-            sessions.insert("default".to_string());
+             if let Ok(metadata) = fs::metadata("session.json") {
+                 if let Ok(modified) = metadata.modified() {
+                     sessions.push(("default".to_string(), modified));
+                 }
+             }
         }
 
         // Look for named session files with retry mechanism to handle race conditions
@@ -245,11 +250,19 @@ impl SessionManager {
                     .unwrap()
                     .strip_suffix(".json")
                     .unwrap();
-                sessions.insert(session_name.to_string());
+                
+                 if let Ok(metadata) = path.metadata() {
+                     if let Ok(modified) = metadata.modified() {
+                         sessions.push((session_name.to_string(), modified));
+                     }
+                 }
             }
         }
 
-        Ok(sessions.into_iter().collect())
+        // Sort by modification time (newest first)
+        sessions.sort_by(|a, b| b.1.cmp(&a.1));
+
+        Ok(sessions.into_iter().map(|(name, _)| name).collect())
     }
 
     /// Get the session filename for a given session name
