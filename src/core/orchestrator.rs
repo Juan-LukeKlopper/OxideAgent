@@ -1,24 +1,18 @@
 use crate::config::LLMConfig;
-use crate::core::agents::Agent;
-use crate::core::session::{SessionManager, SessionState};
-use crate::core::tool_permissions::GlobalToolPermissions;
+use crate::core::multi_agent_manager::{AgentId, MultiAgentManager};
+use crate::core::session::SessionManager;
 use crate::core::tools::ToolRegistry;
-use crate::types::{AppEvent, ChatMessage, ToolApprovalResponse, ToolCall};
-use reqwest::Client;
+use crate::types::{AppEvent, ChatMessage};
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::error;
 
+#[allow(dead_code)] // Some fields kept for future use
 pub struct Orchestrator {
-    agent: Agent,
-    tool_registry: ToolRegistry,
-    client: Client,
+    multi_agent_manager: MultiAgentManager,
+    active_agent_id: Option<AgentId>,
     session_file: String,
-    session_state: SessionState,
-    no_stream: bool,
     tx: mpsc::Sender<AppEvent>,
     rx: mpsc::Receiver<AppEvent>,
-    pending_tool_calls: Option<Vec<ToolCall>>,
-    global_permissions: GlobalToolPermissions,
     model: String,
     llm_config: LLMConfig,
 }
@@ -29,7 +23,7 @@ impl Orchestrator {
         system_prompt: &str,
         tool_registry: ToolRegistry,
         session_name: Option<String>,
-        no_stream: bool,
+        _no_stream: bool, // managed by individual agents/client now
         tx: mpsc::Sender<AppEvent>,
         rx: mpsc::Receiver<AppEvent>,
         model: String,
@@ -40,21 +34,44 @@ impl Orchestrator {
             None => "session.json".to_string(),
         };
 
-        let agent = Agent::new(system_prompt);
-        let session_state = SessionState::new();
-        let global_permissions = GlobalToolPermissions::load().unwrap_or_default();
+        // Create broadcast channel for MultiAgentManager
+        let (event_tx, mut event_rx) = tokio::sync::broadcast::channel(500);
+
+        // Bridge broadcast events to mpsc (for TUI)
+        let tx_clone = tx.clone();
+        tokio::spawn(async move {
+            loop {
+                match event_rx.recv().await {
+                    Ok(event) => {
+                        if let Err(e) = tx_clone.send(event).await {
+                            error!("Failed to forward event to TUI: {}", e);
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                        error!("Bridge lagged, skipped {} events", skipped);
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        break;
+                    }
+                }
+            }
+        });
+
+        let multi_agent_manager = MultiAgentManager::new(
+            system_prompt.to_string(),
+            tool_registry,
+            llm_config.clone(),
+            event_tx, // Pass the broadcast sender
+        );
 
         Self {
-            agent,
-            tool_registry,
-            client: Client::new(),
+            multi_agent_manager,
+            active_agent_id: None,
             session_file,
-            session_state,
-            no_stream,
             tx,
             rx,
-            pending_tool_calls: None,
-            global_permissions,
             model,
             llm_config,
         }
@@ -65,47 +82,40 @@ impl Orchestrator {
     }
 
     pub fn load_state(&mut self) -> anyhow::Result<()> {
-        match SessionManager::load_state(&self.session_file)? {
-            Some(session_state) => {
-                // Set the agent's history from the session
-                self.agent.history = session_state.history().clone();
-
-                // Set the model from the session (if it exists in the session)
-                self.model = session_state.model().to_string();
-
-                // Save the session state (now with the model updated)
-                self.session_state = session_state;
-            }
-            None => {
-                // File doesn't exist, use default session state
-                self.session_state = SessionState::new();
-            }
-        }
+        // State loading is now handled per-agent in MultiAgentManager
+        // This method might be deprecated or used to restore the *active* agent
         Ok(())
     }
 
     fn save_state(&mut self) -> anyhow::Result<()> {
-        let mut session_state = self.session_state.clone();
-        session_state.set_history(self.agent.history.clone());
-        session_state.set_model(self.model.clone()); // Save the current model to the session
-        SessionManager::save_state(&self.session_file, &session_state)?;
+        // State saving is handled per-agent in MultiAgentManager
         Ok(())
     }
 
-    pub fn switch_session(&mut self, session_name: Option<String>) -> anyhow::Result<()> {
-        // Save current state first
-        self.save_state()?;
+    #[allow(dead_code)]
+    pub fn switch_session(&mut self, _session_name: Option<String>) -> anyhow::Result<()> {
+        if let Some(_agent_id) = &self.active_agent_id {
+            // Session switching is now async and handled in the run() loop
+            return Ok(());
+        }
+        Ok(())
+    }
 
-        // Update session file name
-        self.session_file = SessionManager::get_session_filename(session_name.as_deref());
-
-        // Reset agent history
-        self.agent.history.clear();
-        self.session_state = SessionState::new();
-
-        // Load new session (which will set the history and model from the session)
-        self.load_state()?;
-
+    pub async fn initialize_default_agent(&mut self, session_name: Option<String>, model: String) -> anyhow::Result<()> {
+        self.model = model.clone();
+        
+        // Check if default agent exists
+        if let Some(agent) = self.multi_agent_manager.get_agent_by_name("default").await {
+            self.active_agent_id = Some(agent.agent_info.id);
+        } else {
+            // Create default agent
+            let agent_id = self.multi_agent_manager.create_agent(
+                "default",
+                &model,
+                session_name
+            ).await?;
+            self.active_agent_id = Some(agent_id);
+        }
         Ok(())
     }
 
@@ -113,77 +123,90 @@ impl Orchestrator {
         while let Some(event) = self.rx.recv().await {
             match event {
                 AppEvent::UserInput(input) => {
-                    if let Err(e) = self.handle_user_input(&input).await {
-                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    if let Some(agent_id) = &self.active_agent_id {
+                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::UserInput(input)).await {
+                            self.tx.send(AppEvent::Error(e.to_string())).await?;
+                        }
+                    } else {
+                         self.tx.send(AppEvent::Error("No active agent".to_string())).await?;
                     }
                 }
                 AppEvent::ToolApproval(response) => {
-                    if let Err(e) = self.handle_tool_approval(response).await {
-                        self.tx.send(AppEvent::Error(e.to_string())).await?;
-                    }
-                    // After handling tool approval, continue the conversation
-                    if let Err(e) = self.chat_with_agent().await {
-                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                    if let Some(agent_id) = &self.active_agent_id {
+                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::ToolApproval(response)).await {
+                            self.tx.send(AppEvent::Error(e.to_string())).await?;
+                        }
                     }
                 }
                 AppEvent::SwitchSession(session_name) => {
-                    let session_opt = if session_name == "default" {
-                        None
+                    if let Some(agent_id) = &self.active_agent_id {
+                        // Forward session switch request directly to the agent task
+                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(
+                            agent_id,
+                            AppEvent::SwitchSession(session_name)
+                        ).await {
+                             self.tx.send(AppEvent::Error(format!("Failed to switch session: {}", e))).await?;
+                        }
                     } else {
-                        Some(session_name)
-                    };
-
-                    // Clone the session_opt for the display name before moving it
-                    let display_name = session_opt.clone().unwrap_or_else(|| "default".to_string());
-
-                    if let Err(e) = self.switch_session(session_opt) {
-                        self.tx.send(AppEvent::Error(e.to_string())).await?;
-                    } else {
-                        // Notify TUI that session has been switched
-                        self.tx
-                            .send(AppEvent::SessionSwitched(display_name))
-                            .await?;
-
-                        // Send the session history to the TUI
-                        self.tx
-                            .send(AppEvent::SessionHistory(self.get_session_history().clone()))
-                            .await?;
+                        self.tx.send(AppEvent::Error("No active agent to switch session for".to_string())).await?;
                     }
                 }
-                AppEvent::SwitchAgent(agent_name) => {
-                    // Create a new agent with the specified name
-                    let agent_type = match agent_name.as_str() {
-                        "Qwen" => crate::cli::AgentType::Qwen,
-                        "Llama" => crate::cli::AgentType::Llama,
-                        "Granite" => crate::cli::AgentType::Granite,
-                        _ => {
-                            self.tx
-                                .send(AppEvent::Error(format!("Unknown agent: {}", agent_name)))
-                                .await?;
-                            continue;
+
+                AppEvent::SwitchAgent(agent_name, current_session) => {
+                    // Check if agent exists
+                    if let Some(agent) = self.multi_agent_manager.get_agent_by_name(&agent_name).await {
+                        let new_agent_id = agent.agent_info.id;
+                        self.active_agent_id = Some(new_agent_id.clone());
+                        self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
+
+                        // Update Active Model in TUI
+                        let model = agent.session_state.read().await.model().to_string();
+                        self.tx.send(AppEvent::SwitchModel(model)).await?;
+                        
+                        // Migrate current session to the new agent
+                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(
+                            &new_agent_id,
+                            AppEvent::SwitchSession(current_session)
+                        ).await {
+                             self.tx.send(AppEvent::Error(format!("Failed to migrate session: {}", e))).await?;
                         }
-                    };
-
-                    // Update only the system prompt of the agent, keeping the same agent instance
-                    // This ensures we maintain the same agent but with a different system prompt
-                    self.agent.update_system_prompt(agent_type.system_prompt());
-
-                    // Notify TUI that agent has been switched
-                    self.tx
-                        .send(AppEvent::AgentMessage(format!(
-                            "Switched to agent: {}",
-                            agent_name
-                        )))
-                        .await?;
+                    } else {
+                         // Determine model based on agent name (simple mapping for now)
+                         let model = match agent_name.as_str() {
+                             "Qwen" => "qwen3:4b",
+                             "Llama" => "llama3.2",
+                             "Granite" => "granite3.3",
+                             _ => "qwen3:4b", // default fallback
+                         };
+                        
+                        // Create new agent
+                        match self.multi_agent_manager.create_agent(&agent_name, model, None).await {
+                            Ok(agent_id) => {
+                                self.active_agent_id = Some(agent_id.clone());
+                                self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
+                                self.tx.send(AppEvent::SwitchModel(model.to_string())).await?;
+                                
+                                // Migrate current session to the new agent
+                                if let Err(e) = self.multi_agent_manager.send_event_to_agent(
+                                    &agent_id,
+                                    AppEvent::SwitchSession(current_session)
+                                ).await {
+                                     self.tx.send(AppEvent::Error(format!("Failed to migrate session: {}", e))).await?;
+                                }
+                            }
+                            Err(e) => {
+                                self.tx.send(AppEvent::Error(format!("Failed to create agent: {}", e))).await?;
+                            }
+                        }
+                    }
                 }
                 AppEvent::SwitchModel(model_name) => {
+                    // This is harder with MultiAgentManager as model is tied to agent creation usually.
+                    // But we can update it in session state.
+                    // For now, we might want to just restart the agent or update state?
+                    // MultiAgentManager doesn't expose "change model" directly on handle, but session state has it.
                     self.model = model_name.clone();
-                    self.tx
-                        .send(AppEvent::AgentMessage(format!(
-                            "Switched to model: {}",
-                            model_name
-                        )))
-                        .await?;
+                    self.tx.send(AppEvent::AgentMessage(format!("Switched to model: {}", model_name))).await?;
                 }
                 AppEvent::ListSessions => match Orchestrator::list_sessions() {
                     Ok(sessions) => {
@@ -208,9 +231,10 @@ impl Orchestrator {
                     }
                 },
                 AppEvent::ContinueConversation => {
-                    // Continue the conversation after tool execution
-                    if let Err(e) = self.chat_with_agent().await {
-                        self.tx.send(AppEvent::Error(e.to_string())).await?;
+                     if let Some(agent_id) = &self.active_agent_id {
+                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::ContinueConversation).await {
+                            self.tx.send(AppEvent::Error(e.to_string())).await?;
+                        }
                     }
                 }
                 _ => {}
@@ -219,228 +243,13 @@ impl Orchestrator {
         Ok(())
     }
 
-    pub async fn handle_user_input(&mut self, input: &str) -> anyhow::Result<()> {
-        // If no pending tool calls, this is a new user message
-        self.agent.add_user_message(input);
-        self.chat_with_agent().await
-    }
+    // Helper methods handle_user_input, handle_tool_approval, chat_with_agent, execute_tool, save_state are removed
+    // as their logic is now handled by MultiAgentManager and the run loop.
 
-    async fn handle_tool_approval(&mut self, response: ToolApprovalResponse) -> anyhow::Result<()> {
-        if let Some(tool_calls) = self.pending_tool_calls.take() {
-            match response {
-                ToolApprovalResponse::Allow => {
-                    for tool_call in tool_calls {
-                        let tool_output = self.execute_tool(&tool_call).await?;
-                        self.tx
-                            .send(AppEvent::ToolResult(
-                                tool_call.function.name.clone(),
-                                tool_output.clone(),
-                            ))
-                            .await?;
-                        self.agent.add_user_message(&format!(
-                            "The tool '{}' produced this output:\n{}",
-                            tool_call.function.name, tool_output
-                        ));
-                    }
-                    self.save_state()?;
-                    // Send event to continue conversation
-                    self.tx.send(AppEvent::ContinueConversation).await?;
-                }
-                ToolApprovalResponse::AlwaysAllow => {
-                    // Add tools to global permissions
-                    for tool_call in &tool_calls {
-                        self.global_permissions
-                            .add_allowed(&tool_call.function.name);
-                    }
-                    // Save global permissions
-                    if let Err(e) = self.global_permissions.save() {
-                        self.tx
-                            .send(AppEvent::Error(format!(
-                                "Failed to save global tool permissions: {}",
-                                e
-                            )))
-                            .await?;
-                    }
-
-                    // Execute tools
-                    for tool_call in tool_calls {
-                        let tool_output = self.execute_tool(&tool_call).await?;
-                        self.tx
-                            .send(AppEvent::ToolResult(
-                                tool_call.function.name.clone(),
-                                tool_output.clone(),
-                            ))
-                            .await?;
-                        self.agent.add_user_message(&format!(
-                            "The tool '{}' produced this output:\n{}",
-                            tool_call.function.name, tool_output
-                        ));
-                    }
-                    self.save_state()?;
-                    // Send event to continue conversation
-                    self.tx.send(AppEvent::ContinueConversation).await?;
-                }
-                ToolApprovalResponse::AlwaysAllowSession => {
-                    // Add tools to session permissions
-                    for tool_call in &tool_calls {
-                        self.session_state
-                            .add_allowed_tool(tool_call.function.name.clone());
-                    }
-
-                    // Execute tools
-                    for tool_call in tool_calls {
-                        let tool_output = self.execute_tool(&tool_call).await?;
-                        self.tx
-                            .send(AppEvent::ToolResult(
-                                tool_call.function.name.clone(),
-                                tool_output.clone(),
-                            ))
-                            .await?;
-                        self.agent.add_user_message(&format!(
-                            "The tool '{}' produced this output:\n{}",
-                            tool_call.function.name, tool_output
-                        ));
-                    }
-                    self.save_state()?;
-                    // Send event to continue conversation
-                    self.tx.send(AppEvent::ContinueConversation).await?;
-                }
-                ToolApprovalResponse::Deny => {
-                    self.agent
-                        .add_user_message("Tool execution denied by user.");
-                    self.tx
-                        .send(AppEvent::AgentMessage("Tool execution denied.".to_string()))
-                        .await?;
-                    self.save_state()?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    async fn chat_with_agent(&mut self) -> anyhow::Result<()> {
-        // Removed the loop since it only iterates once
-        let tool_definitions = self.tool_registry.definitions();
-
-        // Log the tools being sent for debugging
-        info!("=== ORCHESTRATOR CHAT REQUEST START ===");
-        info!(
-            "Preparing to send chat request with {} tools",
-            tool_definitions.len()
-        );
-        for (i, tool) in tool_definitions.iter().enumerate() {
-            info!(
-                "  {}. Tool: {} - {}",
-                i + 1,
-                tool.function.name,
-                tool.truncated_description()
-            );
-        }
-
-        info!(
-            "Sending chat request to agent with model: {}...",
-            &self.model
-        );
-        let response = self
-            .agent
-            .chat(
-                &self.client,
-                &self.model,
-                &tool_definitions,
-                !self.no_stream,
-                self.tx.clone(),
-                &self.llm_config.api_base,
-            )
-            .await?;
-
-        info!("=== ORCHESTRATOR CHAT REQUEST END ===");
-
-        if let Some(response) = response {
-            if let Some(tool_calls) = &response.tool_calls {
-                info!("=== ORCHESTRATOR RECEIVED TOOL CALLS ===");
-                info!("Received {} tool calls from agent", tool_calls.len());
-
-                // Check if all tools are already approved
-                let all_approved = tool_calls.iter().all(|tool_call| {
-                    // Check global permissions first
-                    if self.global_permissions.is_allowed(&tool_call.function.name) {
-                        info!("Tool '{}' is globally approved", tool_call.function.name);
-                        return true;
-                    }
-                    // Check session permissions
-                    if self.session_state.is_tool_allowed(&tool_call.function.name) {
-                        info!("Tool '{}' is session approved", tool_call.function.name);
-                        return true;
-                    }
-                    info!("Tool '{}' requires approval", tool_call.function.name);
-                    // Not approved
-                    false
-                });
-
-                if all_approved {
-                    info!("All tool calls are approved, executing automatically...");
-                    // Execute all tools without approval
-                    for (i, tool_call) in tool_calls.iter().enumerate() {
-                        info!(
-                            "Executing tool call {}: {} with args: {}",
-                            i + 1,
-                            tool_call.function.name,
-                            tool_call.function.arguments
-                        );
-                        let tool_output = self.execute_tool(tool_call).await?;
-                        info!(
-                            "Tool '{}' completed with output: {}",
-                            tool_call.function.name, tool_output
-                        );
-                        self.tx
-                            .send(AppEvent::ToolResult(
-                                tool_call.function.name.clone(),
-                                tool_output.clone(),
-                            ))
-                            .await?;
-                        self.agent.add_user_message(&format!(
-                            "The tool '{}' produced this output:\n{}",
-                            tool_call.function.name, tool_output
-                        ));
-                    }
-                    self.save_state()?;
-                } else {
-                    info!("Some tool calls require approval, requesting user approval...");
-                    // Send tool calls for approval
-                    self.tx
-                        .send(AppEvent::ToolRequest(tool_calls.clone()))
-                        .await?;
-                    self.pending_tool_calls = Some(tool_calls.clone());
-                }
-                info!("=== ORCHESTRATOR TOOL CALL PROCESSING END ===");
-            } else if self.no_stream {
-                // For non-streaming responses, we need to send AgentMessage to display the content
-                info!(
-                    "Non-streaming response received, sending to UI: {} chars",
-                    response.content.len()
-                );
-                self.tx
-                    .send(AppEvent::AgentMessage(response.content.clone()))
-                    .await?;
-            }
-            // For streaming responses, the content is already displayed via AgentStreamChunk events
-            // The streaming case is handled by the UI, which accumulates chunks into a message
-        }
-        self.save_state()?;
-        Ok(())
-    }
-
-    async fn execute_tool(&self, tool_call: &ToolCall) -> anyhow::Result<String> {
-        if let Some(tool) = self.tool_registry.get_tool(&tool_call.function.name) {
-            tool.execute(&tool_call.function.arguments).await
-        } else {
-            let error_msg = format!("Unknown tool: {}", tool_call.function.name);
-            self.tx.send(AppEvent::Error(error_msg.clone())).await?;
-            Err(anyhow::anyhow!(error_msg))
-        }
-    }
-
-    pub fn get_session_history(&self) -> &Vec<ChatMessage> {
-        self.session_state.history()
+    pub fn get_session_history(&self) -> Vec<ChatMessage> {
+        // Return empty for now as verifying this synchronously is hard with MultiAgentManager
+        // TUI should rely on SessionHistory event
+        vec![]
     }
 }
+
