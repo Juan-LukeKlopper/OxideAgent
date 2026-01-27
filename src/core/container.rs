@@ -4,7 +4,6 @@
 //! between components in the application.
 
 use crate::config::OxideConfig;
-use crate::core::agents::Agent;
 use crate::core::mcp_manager::McpManager;
 use crate::core::orchestrator::Orchestrator;
 use crate::core::session::SessionManager;
@@ -17,7 +16,6 @@ use tokio::sync::mpsc;
 /// Service container for managing dependencies
 pub struct Container {
     config: Arc<OxideConfig>,
-    agent: Option<Agent>,
     tool_registry: Option<ToolRegistry>,
     #[allow(dead_code)]
     session_manager: Option<SessionManager>,
@@ -28,7 +26,6 @@ impl Container {
     pub fn new(config: OxideConfig) -> Self {
         Self {
             config: Arc::new(config),
-            agent: None,
             tool_registry: None,
             session_manager: None,
         }
@@ -43,15 +40,6 @@ impl Container {
     #[allow(dead_code)]
     pub fn config_mut(&mut self) -> &mut OxideConfig {
         Arc::get_mut(&mut self.config).expect("Config is shared")
-    }
-
-    /// Build the agent
-    pub fn build_agent(&mut self) -> Result<&mut Agent> {
-        if self.agent.is_none() {
-            let agent = Agent::new(&self.config.agent.system_prompt);
-            self.agent = Some(agent);
-        }
-        Ok(self.agent.as_mut().unwrap())
     }
 
     /// Build the tool registry
@@ -124,7 +112,6 @@ impl Container {
         let llm_config = self.config.llm.clone();
 
         // Build dependencies (we call these to ensure they're initialized)
-        let _agent = self.build_agent()?;
         let tool_registry = self.build_tool_registry().await?;
 
         Ok(Orchestrator::new(
