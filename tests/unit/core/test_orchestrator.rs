@@ -6,8 +6,8 @@ use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
 use tokio::sync::mpsc;
 
-#[test]
-fn test_orchestrator_new() {
+#[tokio::test]
+async fn test_orchestrator_new() {
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory
@@ -54,8 +54,8 @@ fn test_orchestrator_new() {
     // Directory will be automatically restored by the guard
 }
 
-#[test]
-fn test_orchestrator_get_session_history() {
+#[tokio::test]
+async fn test_orchestrator_get_session_history() {
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory
@@ -101,8 +101,8 @@ fn test_orchestrator_get_session_history() {
     // Directory will be automatically restored by the guard
 }
 
-#[test]
-fn test_orchestrator_load_state_empty() {
+#[tokio::test]
+async fn test_orchestrator_load_state_empty() {
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory
@@ -178,5 +178,6 @@ fn create_test_config() -> Config {
             api_key: None,
             model: Some("qwen3:4b".to_string()),
         },
+        multi_agent: OxideAgent::config::MultiAgentConfig::default(),
     }
 }
