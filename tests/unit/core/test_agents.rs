@@ -1,11 +1,13 @@
 //! Unit tests for the agents module.
 
 use OxideAgent::core::agents::{Agent, AgentId};
+use OxideAgent::core::mocks::MockOllamaClient;
 use OxideAgent::types::ChatMessage;
 
 #[test]
 fn test_agent_new() {
-    let agent = Agent::new("You are a helpful assistant.");
+    let client = Box::new(MockOllamaClient::new());
+    let agent = Agent::new("You are a helpful assistant.", client);
 
     assert_eq!(agent.history.len(), 1); // System message
     assert_eq!(agent.history[0].role, "system");
@@ -14,7 +16,8 @@ fn test_agent_new() {
 
 #[test]
 fn test_agent_add_user_message() {
-    let mut agent = Agent::new("You are a helpful assistant.");
+    let client = Box::new(MockOllamaClient::new());
+    let mut agent = Agent::new("You are a helpful assistant.", client);
 
     agent.add_user_message("Hello, world!");
 
@@ -25,7 +28,8 @@ fn test_agent_add_user_message() {
 
 #[test]
 fn test_agent_add_assistant_message() {
-    let mut agent = Agent::new("You are a helpful assistant.");
+    let client = Box::new(MockOllamaClient::new());
+    let mut agent = Agent::new("You are a helpful assistant.", client);
 
     let assistant_message = ChatMessage::assistant("Hello, user!");
     agent.add_assistant_message(assistant_message);
@@ -37,7 +41,8 @@ fn test_agent_add_assistant_message() {
 
 #[test]
 fn test_agent_update_system_prompt() {
-    let mut agent = Agent::new("You are a helpful assistant.");
+    let client = Box::new(MockOllamaClient::new());
+    let mut agent = Agent::new("You are a helpful assistant.", client);
 
     // Initially has system message
     assert_eq!(agent.history[0].content, "You are a helpful assistant.");
@@ -64,7 +69,8 @@ fn test_agent_id_debug() {
 
 #[test]
 fn test_agent_history_modifications() {
-    let mut agent = Agent::new("You are a helpful assistant.");
+    let client = Box::new(MockOllamaClient::new());
+    let mut agent = Agent::new("You are a helpful assistant.", client);
 
     // Initially has system message
     assert_eq!(agent.history.len(), 1);
