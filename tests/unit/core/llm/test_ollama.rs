@@ -1,4 +1,5 @@
-use OxideAgent::core::llm::ollama::{list_models, send_chat};
+use OxideAgent::core::llm::client::LlmClient;
+use OxideAgent::core::llm::ollama::{list_models, OllamaClient};
 use OxideAgent::types::{AppEvent, ChatMessage, Tool, ToolFunctionDefinition};
 use httpmock::prelude::*;
 use reqwest::Client;
@@ -11,6 +12,7 @@ async fn test_list_models_success() {
     let mock = server.mock(|when, then| {
         when.method(GET).path("/api/tags");
         then.status(200)
+        // ... (unchanged)
             .header("content-type", "application/json")
             .json_body(json!({
                 "models": [
@@ -30,6 +32,7 @@ async fn test_list_models_success() {
     assert_eq!(models, vec!["model1", "model2"]);
 }
 
+// ... helper for other list_models tests ...
 #[tokio::test]
 async fn test_list_models_empty() {
     let server = MockServer::start();
@@ -41,11 +44,9 @@ async fn test_list_models_empty() {
                 "models": []
             }));
     });
-
     let client = Client::new();
     let base_url = server.base_url();
     let result = list_models(&client, &base_url).await;
-
     mock.assert();
     assert!(result.is_ok());
     let models = result.unwrap();
@@ -59,14 +60,13 @@ async fn test_list_models_error() {
         when.method(GET).path("/api/tags");
         then.status(500);
     });
-
     let client = Client::new();
     let base_url = server.base_url();
     let result = list_models(&client, &base_url).await;
-
     mock.assert();
     assert!(result.is_err());
 }
+
 
 #[tokio::test]
 async fn test_send_chat_non_streaming_success() {
@@ -83,12 +83,12 @@ async fn test_send_chat_non_streaming_success() {
             }));
     });
 
-    let client = Client::new();
+    let base_url = server.base_url();
+    let client = OllamaClient::new(&base_url);
     let (tx, _) = mpsc::channel(1);
     let history = vec![ChatMessage::user("Hello")];
     let tools = vec![];
-    let base_url = server.base_url();
-    let result = send_chat(&client, "model1", &history, &tools, false, tx, &base_url).await;
+    let result = client.chat("model1", &history, &tools, false, tx).await;
 
     mock.assert();
     assert!(result.is_ok());
@@ -119,7 +119,8 @@ async fn test_send_chat_non_streaming_with_tools() {
             }));
     });
 
-    let client = Client::new();
+    let base_url = server.base_url();
+    let client = OllamaClient::new(&base_url);
     let (tx, _) = mpsc::channel(1);
     let history = vec![ChatMessage::user("Use the test tool")];
     let tools = vec![Tool {
@@ -130,8 +131,7 @@ async fn test_send_chat_non_streaming_with_tools() {
             parameters: json!({}),
         },
     }];
-    let base_url = server.base_url();
-    let result = send_chat(&client, "model1", &history, &tools, false, tx, &base_url).await;
+    let result = client.chat("model1", &history, &tools, false, tx).await;
 
     mock.assert();
     assert!(result.is_ok());
@@ -154,12 +154,12 @@ async fn test_send_chat_streaming_success() {
             .body(body);
     });
 
-    let client = Client::new();
+    let base_url = server.base_url();
+    let client = OllamaClient::new(&base_url);
     let (tx, mut rx) = mpsc::channel(10);
     let history = vec![ChatMessage::user("Hello")];
     let tools = vec![];
-    let base_url = server.base_url();
-    let chat_future = send_chat(&client, "model1", &history, &tools, true, tx, &base_url);
+    let chat_future = client.chat("model1", &history, &tools, true, tx);
 
     let mut received_content = String::new();
     let mut stream_ended = false;
