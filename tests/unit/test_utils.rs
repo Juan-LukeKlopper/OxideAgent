@@ -109,7 +109,8 @@ async fn test_mock_tool_failure() {
 
 #[test]
 fn test_create_mock_agent() {
-    let agent = OxideAgent::core::agents::Agent::new("MockAgent");
+    let client = Box::new(OxideAgent::core::mocks::MockOllamaClient::new());
+    let agent = OxideAgent::core::agents::Agent::new("MockAgent", client);
 
     // Check that the agent has a system message
     assert!(!agent.history.is_empty());
@@ -142,6 +143,7 @@ fn test_create_test_config() {
             api_key: None,
             model: Some("qwen3:4b".to_string()),
         },
+        multi_agent: Default::default(),
     };
 
     assert_eq!(config.agent.name, "Qwen");
