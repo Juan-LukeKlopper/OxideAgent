@@ -14,8 +14,6 @@ fn test_container_new() {
     assert_eq!(container.config().agent.name, "Qwen");
 }
 
-
-
 #[tokio::test]
 async fn test_container_build_tool_registry() {
     let config = create_test_config();

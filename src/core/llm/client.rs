@@ -1,7 +1,7 @@
 use crate::types::{AppEvent, ChatMessage, Tool};
 use async_trait::async_trait;
-use tokio::sync::mpsc;
 use std::fmt::Debug;
+use tokio::sync::mpsc;
 
 /// Trait defining the interface for LLM clients.
 /// This allows the agent to interact with different LLM providers (Ollama, OpenAI, etc.)

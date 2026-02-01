@@ -129,11 +129,7 @@ impl SessionManager {
                             std::thread::sleep(std::time::Duration::from_millis(10 * attempts));
                         } else {
                             // Log the error but don't crash
-                            warn!(
-                                "Failed to read session file '{}': {}",
-                                path.display(),
-                                e
-                            );
+                            warn!("Failed to read session file '{}': {}", path.display(), e);
                             return Ok(Some(SessionState::new()));
                         }
                     }
@@ -210,11 +206,11 @@ impl SessionManager {
 
         // Check for the default session file
         if Path::new("session.json").exists() {
-             if let Ok(metadata) = fs::metadata("session.json") {
-                 if let Ok(modified) = metadata.modified() {
-                     sessions.push(("default".to_string(), modified));
-                 }
-             }
+            if let Ok(metadata) = fs::metadata("session.json") {
+                if let Ok(modified) = metadata.modified() {
+                    sessions.push(("default".to_string(), modified));
+                }
+            }
         }
 
         // Look for named session files with retry mechanism to handle race conditions
@@ -250,12 +246,12 @@ impl SessionManager {
                     .unwrap()
                     .strip_suffix(".json")
                     .unwrap();
-                
-                 if let Ok(metadata) = path.metadata() {
-                     if let Ok(modified) = metadata.modified() {
-                         sessions.push((session_name.to_string(), modified));
-                     }
-                 }
+
+                if let Ok(metadata) = path.metadata() {
+                    if let Ok(modified) = metadata.modified() {
+                        sessions.push((session_name.to_string(), modified));
+                    }
+                }
             }
         }
 

@@ -101,19 +101,22 @@ impl Orchestrator {
         Ok(())
     }
 
-    pub async fn initialize_default_agent(&mut self, session_name: Option<String>, model: String) -> anyhow::Result<()> {
+    pub async fn initialize_default_agent(
+        &mut self,
+        session_name: Option<String>,
+        model: String,
+    ) -> anyhow::Result<()> {
         self.model = model.clone();
-        
+
         // Check if default agent exists
         if let Some(agent) = self.multi_agent_manager.get_agent_by_name("default").await {
             self.active_agent_id = Some(agent.agent_info.id);
         } else {
             // Create default agent
-            let agent_id = self.multi_agent_manager.create_agent(
-                "default",
-                &model,
-                session_name
-            ).await?;
+            let agent_id = self
+                .multi_agent_manager
+                .create_agent("default", &model, session_name)
+                .await?;
             self.active_agent_id = Some(agent_id);
         }
         Ok(())
@@ -124,16 +127,26 @@ impl Orchestrator {
             match event {
                 AppEvent::UserInput(input) => {
                     if let Some(agent_id) = &self.active_agent_id {
-                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::UserInput(input)).await {
+                        if let Err(e) = self
+                            .multi_agent_manager
+                            .send_event_to_agent(agent_id, AppEvent::UserInput(input))
+                            .await
+                        {
                             self.tx.send(AppEvent::Error(e.to_string())).await?;
                         }
                     } else {
-                         self.tx.send(AppEvent::Error("No active agent".to_string())).await?;
+                        self.tx
+                            .send(AppEvent::Error("No active agent".to_string()))
+                            .await?;
                     }
                 }
                 AppEvent::ToolApproval(response) => {
                     if let Some(agent_id) = &self.active_agent_id {
-                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::ToolApproval(response)).await {
+                        if let Err(e) = self
+                            .multi_agent_manager
+                            .send_event_to_agent(agent_id, AppEvent::ToolApproval(response))
+                            .await
+                        {
                             self.tx.send(AppEvent::Error(e.to_string())).await?;
                         }
                     }
@@ -141,61 +154,105 @@ impl Orchestrator {
                 AppEvent::SwitchSession(session_name) => {
                     if let Some(agent_id) = &self.active_agent_id {
                         // Forward session switch request directly to the agent task
-                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(
-                            agent_id,
-                            AppEvent::SwitchSession(session_name)
-                        ).await {
-                             self.tx.send(AppEvent::Error(format!("Failed to switch session: {}", e))).await?;
+                        if let Err(e) = self
+                            .multi_agent_manager
+                            .send_event_to_agent(agent_id, AppEvent::SwitchSession(session_name))
+                            .await
+                        {
+                            self.tx
+                                .send(AppEvent::Error(format!("Failed to switch session: {}", e)))
+                                .await?;
                         }
                     } else {
-                        self.tx.send(AppEvent::Error("No active agent to switch session for".to_string())).await?;
+                        self.tx
+                            .send(AppEvent::Error(
+                                "No active agent to switch session for".to_string(),
+                            ))
+                            .await?;
                     }
                 }
 
                 AppEvent::SwitchAgent(agent_name, current_session) => {
                     // Check if agent exists
-                    if let Some(agent) = self.multi_agent_manager.get_agent_by_name(&agent_name).await {
+                    if let Some(agent) = self
+                        .multi_agent_manager
+                        .get_agent_by_name(&agent_name)
+                        .await
+                    {
                         let new_agent_id = agent.agent_info.id;
                         self.active_agent_id = Some(new_agent_id.clone());
-                        self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
+                        self.tx
+                            .send(AppEvent::AgentMessage(format!(
+                                "Switched to agent: {}",
+                                agent_name
+                            )))
+                            .await?;
 
                         // Update Active Model in TUI
                         let model = agent.session_state.read().await.model().to_string();
                         self.tx.send(AppEvent::SwitchModel(model)).await?;
-                        
+
                         // Migrate current session to the new agent
-                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(
-                            &new_agent_id,
-                            AppEvent::SwitchSession(current_session)
-                        ).await {
-                             self.tx.send(AppEvent::Error(format!("Failed to migrate session: {}", e))).await?;
+                        if let Err(e) = self
+                            .multi_agent_manager
+                            .send_event_to_agent(
+                                &new_agent_id,
+                                AppEvent::SwitchSession(current_session),
+                            )
+                            .await
+                        {
+                            self.tx
+                                .send(AppEvent::Error(format!("Failed to migrate session: {}", e)))
+                                .await?;
                         }
                     } else {
-                         // Determine model based on agent name (simple mapping for now)
-                         let model = match agent_name.as_str() {
-                             "Qwen" => "qwen3:4b",
-                             "Llama" => "llama3.2",
-                             "Granite" => "granite3.3",
-                             _ => "qwen3:4b", // default fallback
-                         };
-                        
+                        // Determine model based on agent name (simple mapping for now)
+                        let model = match agent_name.as_str() {
+                            "Qwen" => "qwen3:4b",
+                            "Llama" => "llama3.2",
+                            "Granite" => "granite3.3",
+                            _ => "qwen3:4b", // default fallback
+                        };
+
                         // Create new agent
-                        match self.multi_agent_manager.create_agent(&agent_name, model, None).await {
+                        match self
+                            .multi_agent_manager
+                            .create_agent(&agent_name, model, None)
+                            .await
+                        {
                             Ok(agent_id) => {
                                 self.active_agent_id = Some(agent_id.clone());
-                                self.tx.send(AppEvent::AgentMessage(format!("Switched to agent: {}", agent_name))).await?;
-                                self.tx.send(AppEvent::SwitchModel(model.to_string())).await?;
-                                
+                                self.tx
+                                    .send(AppEvent::AgentMessage(format!(
+                                        "Switched to agent: {}",
+                                        agent_name
+                                    )))
+                                    .await?;
+                                self.tx
+                                    .send(AppEvent::SwitchModel(model.to_string()))
+                                    .await?;
+
                                 // Migrate current session to the new agent
-                                if let Err(e) = self.multi_agent_manager.send_event_to_agent(
-                                    &agent_id,
-                                    AppEvent::SwitchSession(current_session)
-                                ).await {
-                                     self.tx.send(AppEvent::Error(format!("Failed to migrate session: {}", e))).await?;
+                                if let Err(e) = self
+                                    .multi_agent_manager
+                                    .send_event_to_agent(
+                                        &agent_id,
+                                        AppEvent::SwitchSession(current_session),
+                                    )
+                                    .await
+                                {
+                                    self.tx
+                                        .send(AppEvent::Error(format!(
+                                            "Failed to migrate session: {}",
+                                            e
+                                        )))
+                                        .await?;
                                 }
                             }
                             Err(e) => {
-                                self.tx.send(AppEvent::Error(format!("Failed to create agent: {}", e))).await?;
+                                self.tx
+                                    .send(AppEvent::Error(format!("Failed to create agent: {}", e)))
+                                    .await?;
                             }
                         }
                     }
@@ -206,7 +263,12 @@ impl Orchestrator {
                     // For now, we might want to just restart the agent or update state?
                     // MultiAgentManager doesn't expose "change model" directly on handle, but session state has it.
                     self.model = model_name.clone();
-                    self.tx.send(AppEvent::AgentMessage(format!("Switched to model: {}", model_name))).await?;
+                    self.tx
+                        .send(AppEvent::AgentMessage(format!(
+                            "Switched to model: {}",
+                            model_name
+                        )))
+                        .await?;
                 }
                 AppEvent::ListSessions => match Orchestrator::list_sessions() {
                     Ok(sessions) => {
@@ -231,8 +293,12 @@ impl Orchestrator {
                     }
                 },
                 AppEvent::ContinueConversation => {
-                     if let Some(agent_id) = &self.active_agent_id {
-                        if let Err(e) = self.multi_agent_manager.send_event_to_agent(agent_id, AppEvent::ContinueConversation).await {
+                    if let Some(agent_id) = &self.active_agent_id {
+                        if let Err(e) = self
+                            .multi_agent_manager
+                            .send_event_to_agent(agent_id, AppEvent::ContinueConversation)
+                            .await
+                        {
                             self.tx.send(AppEvent::Error(e.to_string())).await?;
                         }
                     }
@@ -252,4 +318,3 @@ impl Orchestrator {
         vec![]
     }
 }
-

@@ -290,31 +290,31 @@ fn test_session_manager_list_sessions_sorted_by_recency() {
 
     // Create sessions with delays to ensure different mtimes
     let session_state = SessionState::new();
-    
+
     // Create "old" session first
     SessionManager::save_state("session_old.json", &session_state).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
-    
+
     // Create "middle" session
     SessionManager::save_state("session_middle.json", &session_state).unwrap();
     std::thread::sleep(std::time::Duration::from_millis(50));
-    
+
     // Create "new" session last (most recent)
     SessionManager::save_state("session_new.json", &session_state).unwrap();
 
     // List sessions - should be sorted by recency (newest first)
     let sessions = SessionManager::list_sessions().unwrap();
-    
+
     // Find positions
     let new_pos = sessions.iter().position(|s| s == "new");
     let middle_pos = sessions.iter().position(|s| s == "middle");
     let old_pos = sessions.iter().position(|s| s == "old");
-    
+
     // Verify ordering: new < middle < old (newer sessions have lower indices)
     assert!(new_pos.is_some(), "new session not found");
     assert!(middle_pos.is_some(), "middle session not found");
     assert!(old_pos.is_some(), "old session not found");
-    
+
     assert!(
         new_pos.unwrap() < middle_pos.unwrap(),
         "new session should appear before middle session"

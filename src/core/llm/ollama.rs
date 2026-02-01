@@ -12,9 +12,12 @@ use tracing::{debug, error, info, trace};
 pub async fn list_models(client: &Client, api_base: &str) -> anyhow::Result<Vec<String>> {
     let url = format!("{}/api/tags", api_base);
     let response = client.get(&url).send().await?;
-    
+
     if !response.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to list models: {}", response.status()));
+        return Err(anyhow::anyhow!(
+            "Failed to list models: {}",
+            response.status()
+        ));
     }
 
     let json: serde_json::Value = response.json().await?;
@@ -140,9 +143,9 @@ impl LlmClient for OllamaClient {
                                             tool_call_array.len()
                                         );
                                         for tool_call in tool_call_array {
-                                            if let Ok(tc) =
-                                                serde_json::from_value::<ToolCall>(tool_call.clone())
-                                            {
+                                            if let Ok(tc) = serde_json::from_value::<ToolCall>(
+                                                tool_call.clone(),
+                                            ) {
                                                 debug!(
                                                     "Tool call: {} with args: {}",
                                                     tc.function.name, tc.function.arguments

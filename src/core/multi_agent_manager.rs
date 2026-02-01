@@ -9,7 +9,7 @@ use crate::core::session::{SessionManager, SessionState};
 use crate::core::tool_permissions::GlobalToolPermissions;
 use crate::core::tools::ToolRegistry;
 use crate::types::{AppEvent, ToolApprovalResponse, ToolCall};
-use tracing::{info, error};
+use tracing::{error, info};
 
 struct ChatContext<'a> {
     agent: &'a mut Agent,
@@ -165,7 +165,7 @@ impl MultiAgentManager {
 
             // Track if agent is currently processing to prevent session switch mid-operation
             let mut is_processing = false;
-            
+
             // Queue for deferred session switch
             let mut pending_session_switch: Option<String> = None;
 
@@ -177,7 +177,7 @@ impl MultiAgentManager {
 
             // Create a specialized channel for streaming LLM output to avoid blocking the main loop
             let (stream_tx, mut stream_rx) = mpsc::channel::<AppEvent>(500);
-            
+
             // Spawn a task to forward stream events directly to the broadcast channel
             let event_tx_stream = event_tx_clone.clone();
             tokio::spawn(async move {
@@ -197,7 +197,10 @@ impl MultiAgentManager {
                             AppEvent::SwitchSession(new_session_name) => {
                                 if is_processing {
                                     // Agent is busy, queue the switch for after processing completes
-                                    info!("Agent busy, queuing session switch to: {:?}", new_session_name);
+                                    info!(
+                                        "Agent busy, queuing session switch to: {:?}",
+                                        new_session_name
+                                    );
                                     pending_session_switch = Some(new_session_name);
                                     event_tx_clone.send(AppEvent::AgentMessage(
                                         "Session switch queued - will complete after current response.".to_string()
@@ -206,55 +209,88 @@ impl MultiAgentManager {
                                 }
 
                                 info!("Agent switching session to: {:?}", new_session_name);
-                                
+
                                 // Save current state
                                 {
                                     let state_guard = session_state_for_task.read().await;
                                     let session_file = SessionManager::get_session_filename(
-                                        if current_session_name == "default" { None } else { Some(&current_session_name) }
+                                        if current_session_name == "default" {
+                                            None
+                                        } else {
+                                            Some(&current_session_name)
+                                        },
                                     );
-                                    if let Err(e) = SessionManager::save_state(&session_file, &state_guard) {
+                                    if let Err(e) =
+                                        SessionManager::save_state(&session_file, &state_guard)
+                                    {
                                         error!("Failed to save session state: {}", e);
-                                        event_tx_clone.send(AppEvent::Error(format!("Failed to save session: {}", e))).ok();
+                                        event_tx_clone
+                                            .send(AppEvent::Error(format!(
+                                                "Failed to save session: {}",
+                                                e
+                                            )))
+                                            .ok();
                                         continue;
                                     }
                                 }
 
                                 // Load new state
-                                let new_name_str = if new_session_name == "default" { "default" } else { &new_session_name };
-                                let session_opt = if new_session_name == "default" { None } else { Some(new_session_name.as_str()) };
-                                let new_session_file = SessionManager::get_session_filename(session_opt);
-                                
+                                let new_name_str = if new_session_name == "default" {
+                                    "default"
+                                } else {
+                                    &new_session_name
+                                };
+                                let session_opt = if new_session_name == "default" {
+                                    None
+                                } else {
+                                    Some(new_session_name.as_str())
+                                };
+                                let new_session_file =
+                                    SessionManager::get_session_filename(session_opt);
+
                                 match SessionManager::load_state(&new_session_file) {
                                     Ok(loaded_state) => {
-                                        let new_state = loaded_state.unwrap_or_else(SessionState::new);
-                                        
+                                        let new_state =
+                                            loaded_state.unwrap_or_else(SessionState::new);
+
                                         // Update in-memory state
                                         {
-                                            let mut state_guard = session_state_for_task.write().await;
+                                            let mut state_guard =
+                                                session_state_for_task.write().await;
                                             *state_guard = new_state.clone();
                                         }
-                                        
+
                                         // Update agent history
                                         agent.history = new_state.history().clone();
-                                        
+
                                         // Update local session name
                                         current_session_name = new_name_str.to_string();
 
                                         // Notify TUI
-                                        event_tx_clone.send(AppEvent::SessionSwitched(current_session_name.clone())).ok();
-                                        event_tx_clone.send(AppEvent::SessionHistory(agent.history.clone())).ok();
+                                        event_tx_clone
+                                            .send(AppEvent::SessionSwitched(
+                                                current_session_name.clone(),
+                                            ))
+                                            .ok();
+                                        event_tx_clone
+                                            .send(AppEvent::SessionHistory(agent.history.clone()))
+                                            .ok();
                                     }
                                     Err(e) => {
                                         error!("Failed to load session: {}", e);
-                                        event_tx_clone.send(AppEvent::Error(format!("Failed to load session: {}", e))).ok();
+                                        event_tx_clone
+                                            .send(AppEvent::Error(format!(
+                                                "Failed to load session: {}",
+                                                e
+                                            )))
+                                            .ok();
                                     }
                                 }
                             }
                             AppEvent::UserInput(input) => {
                                 // Mark as processing to prevent session switch mid-operation
                                 is_processing = true;
-                                
+
                                 // Update agent status
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
@@ -287,20 +323,22 @@ impl MultiAgentManager {
                                 {
                                     event_tx_clone.send(AppEvent::Error(e.to_string())).ok();
                                 }
-                                
+
                                 // Mark as done processing
                                 is_processing = false;
-                                
+
                                 // Update status back to Idle
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
                                     "Idle".to_string(),
                                 ));
-                                
+
                                 // Process any pending session switch
                                 if let Some(queued_session) = pending_session_switch.take() {
                                     // Re-queue the switch event so it gets processed next iteration
-                                    let _ = agent_tx.send(AppEvent::SwitchSession(queued_session)).await;
+                                    let _ = agent_tx
+                                        .send(AppEvent::SwitchSession(queued_session))
+                                        .await;
                                 }
                             }
                             AppEvent::ToolApproval(response) => {
@@ -327,7 +365,7 @@ impl MultiAgentManager {
                             AppEvent::ContinueConversation => {
                                 // Mark as processing
                                 is_processing = true;
-                                
+
                                 // Update agent status
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
@@ -351,19 +389,21 @@ impl MultiAgentManager {
                                 {
                                     event_tx_clone.send(AppEvent::Error(e.to_string())).ok();
                                 }
-                                
+
                                 // Mark as done processing
                                 is_processing = false;
-                                
+
                                 // Update status back to Idle
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
                                     "Idle".to_string(),
                                 ));
-                                
+
                                 // Process any pending session switch
                                 if let Some(queued_session) = pending_session_switch.take() {
-                                    let _ = agent_tx.send(AppEvent::SwitchSession(queued_session)).await;
+                                    let _ = agent_tx
+                                        .send(AppEvent::SwitchSession(queued_session))
+                                        .await;
                                 }
                             }
                             AppEvent::AgentStatusUpdate(_, _) => {

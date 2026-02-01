@@ -211,65 +211,78 @@ impl Tui {
         match event {
             AppEvent::AgentStreamChunk(chunk) => {
                 let mut content_to_process = chunk;
-                
+
                 // Safety limiter to prevent infinite loops if logic is buggy
                 let mut loops = 0;
                 while !content_to_process.is_empty() && loops < 100 {
                     loops += 1;
-                    
-                    let is_thinking = matches!(self.messages.last(), Some(Message::Thinking(_, _, _)));
-                    
+
+                    let is_thinking =
+                        matches!(self.messages.last(), Some(Message::Thinking(_, _, _)));
+
                     if is_thinking {
                         if let Some(Message::Thinking(_, content, _)) = self.messages.last_mut() {
-                             content.push_str(&content_to_process);
-                             // Check for closing tag
-                             if let Some(idx) = content.find("</think>") {
-                                 let remainder = content[idx + 8..].to_string(); 
-                                 content.truncate(idx); 
-                                 
-                                 // Switch to Agent mode for the remainder
-                                 self.messages.push(Message::Agent(AgentId::Ollama, String::new()));
-                                 
-                                 content_to_process = remainder; 
-                                 continue;
-                             } else {
-                                 // No closing tag found. Consumed all.
-                                 break;
-                             }
+                            content.push_str(&content_to_process);
+                            // Check for closing tag
+                            if let Some(idx) = content.find("</think>") {
+                                let remainder = content[idx + 8..].to_string();
+                                content.truncate(idx);
+
+                                // Switch to Agent mode for the remainder
+                                self.messages
+                                    .push(Message::Agent(AgentId::Ollama, String::new()));
+
+                                content_to_process = remainder;
+                                continue;
+                            } else {
+                                // No closing tag found. Consumed all.
+                                break;
+                            }
                         } else {
-                             // Should not happen given is_thinking check, but fallback
-                             self.messages.push(Message::Thinking(AgentId::Ollama, content_to_process, false));
-                             break;
+                            // Should not happen given is_thinking check, but fallback
+                            self.messages.push(Message::Thinking(
+                                AgentId::Ollama,
+                                content_to_process,
+                                false,
+                            ));
+                            break;
                         }
                     } else {
-                         // Agent Mode (default)
-                         if self.messages.is_empty() {
-                            self.messages.push(Message::Agent(AgentId::Ollama, String::new()));
+                        // Agent Mode (default)
+                        if self.messages.is_empty() {
+                            self.messages
+                                .push(Message::Agent(AgentId::Ollama, String::new()));
                         }
-                        
-                         // Check if last message is Agent (it should be, or we just pushed one)
-                         // Note: If last message is ToolOutput etc, we should start a new Agent message
-                         let last_is_agent = matches!(self.messages.last(), Some(Message::Agent(_, _)));
-                         if !last_is_agent {
-                             self.messages.push(Message::Agent(AgentId::Ollama, String::new()));
-                         }
 
-                         if let Some(Message::Agent(_, content)) = self.messages.last_mut() {
-                             content.push_str(&content_to_process);
-                             if let Some(idx) = content.find("<think>") {
-                                 let remainder = content[idx + 7..].to_string();
-                                 content.truncate(idx);
-                                 
-                                 // Switch to Thinking
-                                 // Default to collapsed (false)
-                                 self.messages.push(Message::Thinking(AgentId::Ollama, String::new(), false));
-                                 
-                                 content_to_process = remainder;
-                                 continue;
-                             } else {
-                                 break;
-                             }
-                         }
+                        // Check if last message is Agent (it should be, or we just pushed one)
+                        // Note: If last message is ToolOutput etc, we should start a new Agent message
+                        let last_is_agent =
+                            matches!(self.messages.last(), Some(Message::Agent(_, _)));
+                        if !last_is_agent {
+                            self.messages
+                                .push(Message::Agent(AgentId::Ollama, String::new()));
+                        }
+
+                        if let Some(Message::Agent(_, content)) = self.messages.last_mut() {
+                            content.push_str(&content_to_process);
+                            if let Some(idx) = content.find("<think>") {
+                                let remainder = content[idx + 7..].to_string();
+                                content.truncate(idx);
+
+                                // Switch to Thinking
+                                // Default to collapsed (false)
+                                self.messages.push(Message::Thinking(
+                                    AgentId::Ollama,
+                                    String::new(),
+                                    false,
+                                ));
+
+                                content_to_process = remainder;
+                                continue;
+                            } else {
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -483,7 +496,7 @@ impl Tui {
                 self.show_agent_overlay = !self.show_agent_overlay;
                 self.show_session_overlay = false;
                 self.show_model_overlay = false;
-                
+
                 // Reset selection when opening
                 if self.show_agent_overlay {
                     self.switcher_selection = SwitcherSelection::Agent(0);
@@ -495,7 +508,7 @@ impl Tui {
                 self.show_session_overlay = !self.show_session_overlay;
                 self.show_agent_overlay = false;
                 self.show_model_overlay = false;
-                
+
                 // Reset selection when opening
                 if self.show_session_overlay {
                     self.switcher_selection = SwitcherSelection::Session(0);
@@ -509,7 +522,7 @@ impl Tui {
                 self.show_model_overlay = !self.show_model_overlay;
                 self.show_agent_overlay = false;
                 self.show_session_overlay = false;
-                
+
                 // Reset selection when opening
                 if self.show_model_overlay {
                     self.switcher_selection = SwitcherSelection::Model(0);
@@ -548,21 +561,27 @@ impl Tui {
         match self.switcher_selection {
             SwitcherSelection::Agent(idx) => {
                 let len = self.available_agents.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx > 0 { idx - 1 } else { len - 1 };
                 self.switcher_selection = SwitcherSelection::Agent(new_idx);
                 self.adjust_scroll_up(new_idx, panel_height);
             }
             SwitcherSelection::Session(idx) => {
                 let len = self.available_sessions.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx > 0 { idx - 1 } else { len - 1 };
                 self.switcher_selection = SwitcherSelection::Session(new_idx);
                 self.adjust_scroll_up(new_idx, panel_height);
             }
             SwitcherSelection::Model(idx) => {
                 let len = self.available_models.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx > 0 { idx - 1 } else { len - 1 };
                 self.switcher_selection = SwitcherSelection::Model(new_idx);
                 self.adjust_scroll_up(new_idx, panel_height);
@@ -575,21 +594,27 @@ impl Tui {
         match self.switcher_selection {
             SwitcherSelection::Agent(idx) => {
                 let len = self.available_agents.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx + 1 < len { idx + 1 } else { 0 };
                 self.switcher_selection = SwitcherSelection::Agent(new_idx);
                 self.adjust_scroll_down(new_idx, panel_height);
             }
             SwitcherSelection::Session(idx) => {
                 let len = self.available_sessions.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx + 1 < len { idx + 1 } else { 0 };
                 self.switcher_selection = SwitcherSelection::Session(new_idx);
                 self.adjust_scroll_down(new_idx, panel_height);
             }
             SwitcherSelection::Model(idx) => {
                 let len = self.available_models.len();
-                if len == 0 { return; }
+                if len == 0 {
+                    return;
+                }
                 let new_idx = if idx + 1 < len { idx + 1 } else { 0 };
                 self.switcher_selection = SwitcherSelection::Model(new_idx);
                 self.adjust_scroll_down(new_idx, panel_height);
@@ -601,8 +626,8 @@ impl Tui {
         if new_idx < self.switcher_scroll {
             self.switcher_scroll = new_idx;
         } else if new_idx >= self.switcher_scroll + panel_height {
-             // Wrapped around to bottom
-             self.switcher_scroll = new_idx.saturating_sub(panel_height) + 1;
+            // Wrapped around to bottom
+            self.switcher_scroll = new_idx.saturating_sub(panel_height) + 1;
         }
     }
 
@@ -633,7 +658,10 @@ impl Tui {
 
                         // Send switch agent event to orchestrator
                         self.tx
-                            .send(AppEvent::SwitchAgent(agent_type_name.to_string(), self.session_name.clone()))
+                            .send(AppEvent::SwitchAgent(
+                                agent_type_name.to_string(),
+                                self.session_name.clone(),
+                            ))
                             .await?;
                         self.messages
                             .push(Message::User(format!("/switch agent {}", selected_agent)));
@@ -960,27 +988,27 @@ fn ui(
             Line::from(vec![Span::raw("- 3: Always allow for session")]),
             Line::from(vec![Span::raw("- 4: Deny")]),
         ];
-        
+
         // Render background (chat history) dimmed or as is
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .margin(1)
             .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
             .split(f.area());
-            
+
         render_chat_history(f, chunks[0], messages, message_positions, session_name);
         render_input_box(f, chunks[1], input, tool_calls, is_awaiting_confirmation);
-        
+
         // Render help popup
         let block = Block::default()
             .title("Help")
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Cyan));
-            
+
         let paragraph = Paragraph::new(help_text)
             .block(block)
             .wrap(Wrap { trim: true });
-            
+
         f.render_widget(Clear, area); // Clear area behind popup
         f.render_widget(paragraph, area);
     } else if show_agent_overlay || show_session_overlay || show_model_overlay {
@@ -1048,54 +1076,87 @@ fn render_switcher_panel(
         SwitcherSelection::Agent(selected_idx) => {
             let mut text = String::from("Available Agents:\n");
             for (offset, agent) in available_agents.iter().enumerate() {
-                if offset < switcher_scroll || offset >= switcher_scroll + inner_area.height as usize - 1 { // -1 for potential footer
+                if offset < switcher_scroll
+                    || offset >= switcher_scroll + inner_area.height as usize - 1
+                {
+                    // -1 for potential footer
                     continue;
                 }
-                let status = agent_statuses.get(agent).cloned().unwrap_or_else(|| "Idle".to_string());
+                let status = agent_statuses
+                    .get(agent)
+                    .cloned()
+                    .unwrap_or_else(|| "Idle".to_string());
                 let is_selected = offset == selected_idx;
                 let is_current = agent == current_agent;
-                
+
                 let marker = if is_selected { "->" } else { "  " };
                 let current_marker = if is_current { " (current)" } else { "" };
                 let select_marker = if is_selected { " (selected)" } else { "" };
-                
-                text.push_str(&format!(" {} [{}] [{}] {}{}\n", marker, agent, status, current_marker, select_marker));
+
+                text.push_str(&format!(
+                    " {} [{}] [{}] {}{}\n",
+                    marker, agent, status, current_marker, select_marker
+                ));
             }
-            ("Switch Agent (Ctrl+A / Esc to close)", text, available_agents.len())
-        },
+            (
+                "Switch Agent (Ctrl+A / Esc to close)",
+                text,
+                available_agents.len(),
+            )
+        }
         SwitcherSelection::Session(selected_idx) => {
             let mut text = String::from("Available Sessions:\n");
             for (offset, session) in available_sessions.iter().enumerate() {
-                if offset < switcher_scroll || offset >= switcher_scroll + inner_area.height as usize - 1 { // -1 for potential footer
+                if offset < switcher_scroll
+                    || offset >= switcher_scroll + inner_area.height as usize - 1
+                {
+                    // -1 for potential footer
                     continue;
                 }
                 let is_selected = offset == selected_idx;
                 let is_current = session == current_session;
-                
+
                 let marker = if is_selected { "->" } else { "  " };
                 let current_marker = if is_current { " (current)" } else { "" };
                 let select_marker = if is_selected { " (selected)" } else { "" };
-                
-                text.push_str(&format!(" {} [{}]{}{}\n", marker, session, current_marker, select_marker));
+
+                text.push_str(&format!(
+                    " {} [{}]{}{}\n",
+                    marker, session, current_marker, select_marker
+                ));
             }
-            ("Switch Session (Ctrl+S / Esc to close)", text, available_sessions.len())
-        },
+            (
+                "Switch Session (Ctrl+S / Esc to close)",
+                text,
+                available_sessions.len(),
+            )
+        }
         SwitcherSelection::Model(selected_idx) => {
             let mut text = String::from("Available Models:\n");
             for (offset, model) in available_models.iter().enumerate() {
-                if offset < switcher_scroll || offset >= switcher_scroll + inner_area.height as usize - 1 { // -1 for potential footer
+                if offset < switcher_scroll
+                    || offset >= switcher_scroll + inner_area.height as usize - 1
+                {
+                    // -1 for potential footer
                     continue;
                 }
                 let is_selected = offset == selected_idx;
                 let is_current = model == current_model;
-                
+
                 let marker = if is_selected { "->" } else { "  " };
                 let current_marker = if is_current { " (current)" } else { "" };
                 let select_marker = if is_selected { " (selected)" } else { "" };
-                
-                text.push_str(&format!(" {} [{}]{}{}\n", marker, model, current_marker, select_marker));
+
+                text.push_str(&format!(
+                    " {} [{}]{}{}\n",
+                    marker, model, current_marker, select_marker
+                ));
             }
-            ("Switch Model (Ctrl+L / Esc to close)", text, available_models.len())
+            (
+                "Switch Model (Ctrl+L / Esc to close)",
+                text,
+                available_models.len(),
+            )
         }
     };
 
@@ -1109,7 +1170,11 @@ fn render_switcher_panel(
 
     let mut final_content = content_string;
     if total_count > inner_area.height as usize {
-        let footer = format!("\n... {}/{} ... Use Up/Down arrows to navigate, Enter to select.", switcher_scroll + inner_area.height as usize, total_count);
+        let footer = format!(
+            "\n... {}/{} ... Use Up/Down arrows to navigate, Enter to select.",
+            switcher_scroll + inner_area.height as usize,
+            total_count
+        );
         final_content.push_str(&footer);
     } else {
         final_content.push_str("\nUse Up/Down arrows to navigate, Enter to select.\n");

@@ -1,5 +1,5 @@
 use OxideAgent::core::llm::client::LlmClient;
-use OxideAgent::core::llm::ollama::{list_models, OllamaClient};
+use OxideAgent::core::llm::ollama::{OllamaClient, list_models};
 use OxideAgent::types::{AppEvent, ChatMessage, Tool, ToolFunctionDefinition};
 use httpmock::prelude::*;
 use reqwest::Client;
@@ -12,7 +12,7 @@ async fn test_list_models_success() {
     let mock = server.mock(|when, then| {
         when.method(GET).path("/api/tags");
         then.status(200)
-        // ... (unchanged)
+            // ... (unchanged)
             .header("content-type", "application/json")
             .json_body(json!({
                 "models": [
@@ -66,7 +66,6 @@ async fn test_list_models_error() {
     mock.assert();
     assert!(result.is_err());
 }
-
 
 #[tokio::test]
 async fn test_send_chat_non_streaming_success() {

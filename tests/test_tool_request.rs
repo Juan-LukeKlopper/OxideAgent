@@ -1,4 +1,5 @@
-use OxideAgent::core::llm::ollama::send_chat;
+use OxideAgent::core::llm::client::LlmClient;
+use OxideAgent::core::llm::ollama::OllamaClient;
 use OxideAgent::types::{AppEvent, ChatMessage, Tool};
 use reqwest::Client;
 use serde_json::json;
@@ -53,17 +54,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Send the chat request and see what gets logged
     println!("Sending test chat request...");
-    match send_chat(
-        &client,
-        model,
-        &history,
-        &tools,
-        false,
-        tx,
-        "http://localhost:11434",
-    )
-    .await
-    {
+
+    let ollama_client = OllamaClient::new("http://localhost:11434");
+
+    match ollama_client.chat(model, &history, &tools, false, tx).await {
         Ok(response) => {
             println!("Got response: {:?}", response);
         }

@@ -48,10 +48,7 @@ impl GlobalToolPermissions {
                         }
                         match serde_json::from_str(&content) {
                             Ok(permissions) => {
-                                debug!(
-                                    "Successfully parsed permissions: {:?}",
-                                    permissions
-                                );
+                                debug!("Successfully parsed permissions: {:?}", permissions);
                                 return Ok(permissions);
                             }
                             Err(e) => {

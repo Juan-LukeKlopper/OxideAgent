@@ -50,16 +50,19 @@ impl LlmClient for MockOllamaClient {
         // For simplicity, let's just return key based on some logic or fixed response.
         // Since we changed LlmClient to take &self, stateful mocks need RwLock/Mutex/Cell.
         // Or we just return a default response.
-        
+
         let content = if !self.responses.is_empty() {
-             // In a real mock with &self, we'd cycle through checks or have a robust way implies interior mutability.
-             // But existing code had responses: Vec<Value>.
-             // Let's just return the last one or a default.
-             self.responses.last().map(|s| s.as_str()).unwrap_or("Default mock response")
+            // In a real mock with &self, we'd cycle through checks or have a robust way implies interior mutability.
+            // But existing code had responses: Vec<Value>.
+            // Let's just return the last one or a default.
+            self.responses
+                .last()
+                .map(|s| s.as_str())
+                .unwrap_or("Default mock response")
         } else {
-             "Default mock response"
+            "Default mock response"
         };
-        
+
         if stream {
             for c in content.chars() {
                 tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
