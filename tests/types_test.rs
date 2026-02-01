@@ -57,7 +57,7 @@ mod tests {
         // Test some other variants
         let _error = AppEvent::Error("test error".to_string());
         let _switch_session = AppEvent::SwitchSession("session1".to_string());
-        let _switch_agent = AppEvent::SwitchAgent("qwen".to_string());
+        let _switch_agent = AppEvent::SwitchAgent("qwen".to_string(), "default".to_string());
         let _list_sessions = AppEvent::ListSessions;
         let _session_list =
             AppEvent::SessionList(vec!["session1".to_string(), "session2".to_string()]);
