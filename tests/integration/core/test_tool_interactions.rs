@@ -49,6 +49,7 @@ async fn test_tool_execution_workflow() {
             api_key: None,
             model: None,
         },
+        multi_agent: Default::default(),
     };
 
     // Create channels for communication
