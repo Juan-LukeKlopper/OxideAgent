@@ -14,7 +14,8 @@ async fn test_agent_with_mock_ollama_client() {
     let (_tx, _rx): (mpsc::Sender<AppEvent>, mpsc::Receiver<AppEvent>) = mpsc::channel(1);
 
     // Create a test agent
-    let mut agent = Agent::new("TestAgent");
+    let client = Box::new(OxideAgent::core::mocks::MockOllamaClient::new());
+    let mut agent = Agent::new("TestAgent", client);
 
     // Add a user message to trigger a response
     agent.add_user_message("Hello, can you help me?");

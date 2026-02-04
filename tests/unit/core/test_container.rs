@@ -14,15 +14,6 @@ fn test_container_new() {
     assert_eq!(container.config().agent.name, "Qwen");
 }
 
-#[test]
-fn test_container_build_agent() {
-    let config = create_test_config();
-    let mut container = Container::new(config);
-
-    let agent = container.build_agent();
-    assert!(agent.is_ok());
-}
-
 #[tokio::test]
 async fn test_container_build_tool_registry() {
     let config = create_test_config();
@@ -87,11 +78,6 @@ async fn test_container_multiple_build_calls() {
     let mut container = Container::new(config);
 
     // Building components multiple times should not cause issues
-    let agent1 = container.build_agent();
-    assert!(agent1.is_ok());
-
-    let agent2 = container.build_agent();
-    assert!(agent2.is_ok());
 
     let tool_registry1 = container.build_tool_registry().await;
     assert!(tool_registry1.is_ok());
@@ -123,5 +109,6 @@ fn create_test_config() -> Config {
             api_key: None,
             model: Some("qwen3:4b".to_string()),
         },
+        multi_agent: OxideAgent::config::MultiAgentConfig::default(),
     }
 }

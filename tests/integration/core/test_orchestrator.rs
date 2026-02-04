@@ -61,7 +61,8 @@ fn test_tool_registry_creation() {
 
 #[test]
 fn test_agent_creation() {
-    let agent = Agent::new("TestAgent");
+    let client = Box::new(OxideAgent::core::mocks::MockOllamaClient::new());
+    let agent = Agent::new("TestAgent", client);
 
     // Check that the agent has a system message
     assert!(!agent.history.is_empty());

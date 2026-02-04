@@ -20,15 +20,16 @@ pub enum AppEvent {
     ToolRequest(Vec<ToolCall>),
     ToolResult(String, String),
     Error(String),
-    SwitchSession(String),            // New event for switching sessions
-    SwitchAgent(String),              // New event for switching agents
-    SwitchModel(String),              // New event for switching models
-    ListSessions,                     // New event for listing sessions
-    RefreshSessions, // New event for refreshing sessions without displaying response
-    SessionList(Vec<String>), // New event to send session list to TUI
-    SessionSwitched(String), // New event to notify TUI that session has been switched
+    SwitchSession(String),             // New event for switching sessions
+    SwitchAgent(String, String), // New event for switching agents (agent_name, session_context)
+    SwitchModel(String),         // New event for switching models
+    ListSessions,                // New event for listing sessions
+    RefreshSessions,             // New event for refreshing sessions without displaying response
+    SessionList(Vec<String>),    // New event to send session list to TUI
+    SessionSwitched(String),     // New event to notify TUI that session has been switched
     SessionHistory(Vec<ChatMessage>), // New event to send session history to TUI
-    ContinueConversation, // New event to continue conversation after tool execution
+    ContinueConversation,        // New event to continue conversation after tool execution
+    AgentStatusUpdate(String, String), // New event to update agent status (agent_name, status)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

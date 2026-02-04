@@ -189,17 +189,36 @@ fn test_session_manager_load_invalid_json() {
 }
 
 use lazy_static::lazy_static;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 lazy_static! {
     static ref CWD_MUTEX: Mutex<()> = Mutex::new(());
 }
 
+struct CwdGuard {
+    original: PathBuf,
+}
+
+impl CwdGuard {
+    fn new() -> Self {
+        let original = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+        Self { original }
+    }
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.original);
+    }
+}
+
 #[test]
 fn test_session_manager_list_sessions_default() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
-    let original_cwd = std::env::current_dir().unwrap();
+    // let original_cwd = std::env::current_dir().unwrap(); // Handled by guard
 
     // Change to temp directory for testing
     std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -226,16 +245,13 @@ fn test_session_manager_list_sessions_default() {
 
     // Check if default session is listed
     assert!(sessions.contains(&"default".to_string()));
-
-    // Restore original working directory
-    std::env::set_current_dir(&original_cwd).unwrap();
 }
 
 #[test]
 fn test_session_manager_list_sessions_named() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
-    let original_cwd = std::env::current_dir().unwrap();
 
     // Change to temp directory for testing
     std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -262,9 +278,6 @@ fn test_session_manager_list_sessions_named() {
 
     // Check if named session is listed
     assert!(sessions.contains(&"test_named".to_string()));
-
-    // Restore original working directory
-    std::env::set_current_dir(&original_cwd).unwrap();
 }
 
 #[test]
@@ -276,5 +289,51 @@ fn test_session_manager_get_session_filename() {
     assert_eq!(
         SessionManager::get_session_filename(Some("test_session")),
         "session_test_session.json"
+    );
+}
+
+#[test]
+fn test_session_manager_list_sessions_sorted_by_recency() {
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
+    let temp_dir = TempDir::new().unwrap();
+
+    // Change to temp directory for testing
+    std::env::set_current_dir(temp_dir.path()).unwrap();
+
+    // Create sessions with delays to ensure different mtimes
+    let session_state = SessionState::new();
+
+    // Create "old" session first
+    SessionManager::save_state("session_old.json", &session_state).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Create "middle" session
+    SessionManager::save_state("session_middle.json", &session_state).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(50));
+
+    // Create "new" session last (most recent)
+    SessionManager::save_state("session_new.json", &session_state).unwrap();
+
+    // List sessions - should be sorted by recency (newest first)
+    let sessions = SessionManager::list_sessions().unwrap();
+
+    // Find positions
+    let new_pos = sessions.iter().position(|s| s == "new");
+    let middle_pos = sessions.iter().position(|s| s == "middle");
+    let old_pos = sessions.iter().position(|s| s == "old");
+
+    // Verify ordering: new < middle < old (newer sessions have lower indices)
+    assert!(new_pos.is_some(), "new session not found");
+    assert!(middle_pos.is_some(), "middle session not found");
+    assert!(old_pos.is_some(), "old session not found");
+
+    assert!(
+        new_pos.unwrap() < middle_pos.unwrap(),
+        "new session should appear before middle session"
+    );
+    assert!(
+        middle_pos.unwrap() < old_pos.unwrap(),
+        "middle session should appear before old session"
     );
 }

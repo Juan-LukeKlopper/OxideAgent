@@ -30,6 +30,7 @@ async fn test_tool_execution_workflow() {
         list_sessions: false,
         mcp: Default::default(),
         session: None,
+        multi_agent: Default::default(),
     };
 
     // Create channels for communication
@@ -80,6 +81,7 @@ async fn test_orchestrator_session_switching() {
             api_key: None,
             model: None,
         },
+        multi_agent: Default::default(),
     };
 
     // Create channels for communication
@@ -98,7 +100,9 @@ async fn test_orchestrator_session_switching() {
     assert_eq!(history.len(), 0);
 
     // Switch to a new session
-    let result = orchestrator.switch_session(Some("new_session".to_string()));
+    let result = orchestrator
+        .switch_session(Some("new_session".to_string()))
+        .await;
     assert!(result.is_ok());
 
     // Check that the orchestrator can handle the session change
@@ -142,6 +146,7 @@ async fn test_orchestrator_tool_approvals() {
             api_key: None,
             model: None,
         },
+        multi_agent: Default::default(),
     };
 
     // Create channels for communication

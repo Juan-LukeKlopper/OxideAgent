@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
+use tracing::{debug, warn};
 
 /// Global tool permissions that apply across all sessions
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -39,28 +40,25 @@ impl GlobalToolPermissions {
             loop {
                 match fs::read_to_string(path) {
                     Ok(content) => {
-                        eprintln!("DEBUG: Reading content from file: '{}'", content);
+                        debug!("Reading content from file: '{}'", content);
                         // Handle empty file
                         if content.trim().is_empty() {
-                            eprintln!("DEBUG: Empty file, returning default");
+                            debug!("Empty file, returning default");
                             return Ok(Self::default());
                         }
                         match serde_json::from_str(&content) {
                             Ok(permissions) => {
-                                eprintln!(
-                                    "DEBUG: Successfully parsed permissions: {:?}",
-                                    permissions
-                                );
+                                debug!("Successfully parsed permissions: {:?}", permissions);
                                 return Ok(permissions);
                             }
                             Err(e) => {
                                 // Log error but don't crash
-                                eprintln!(
-                                    "Warning: Failed to parse tool permissions file '{}': {}",
+                                warn!(
+                                    "Failed to parse tool permissions file '{}': {}",
                                     path.display(),
                                     e
                                 );
-                                eprintln!("Using default tool permissions as fallback.");
+                                warn!("Using default tool permissions as fallback.");
                                 return Ok(Self::default());
                             }
                         }
@@ -70,8 +68,8 @@ impl GlobalToolPermissions {
                         if e.kind() == std::io::ErrorKind::NotFound || attempts >= max_attempts - 1
                         {
                             // Log error but don't crash
-                            eprintln!(
-                                "Warning: Failed to read tool permissions file '{}': {}",
+                            warn!(
+                                "Failed to read tool permissions file '{}': {}",
                                 path.display(),
                                 e
                             );
@@ -84,7 +82,7 @@ impl GlobalToolPermissions {
                 }
             }
         } else {
-            eprintln!("DEBUG: File doesn't exist, returning default");
+            debug!("File doesn't exist, returning default");
             Ok(Self::default())
         }
     }

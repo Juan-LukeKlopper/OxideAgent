@@ -99,16 +99,26 @@ async fn main() -> anyhow::Result<()> {
         .unwrap_or_else(|| "default".to_string());
 
     // Create channels for communication
-    let (orchestrator_tx, interface_rx) = mpsc::channel::<AppEvent>(32);
-    let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(32);
+    let (orchestrator_tx, interface_rx) = mpsc::channel::<AppEvent>(100);
+    let (interface_tx, orchestrator_rx) = mpsc::channel::<AppEvent>(100);
 
     // Build the orchestrator using the container
     let mut orchestrator = container
         .build_orchestrator(orchestrator_tx, orchestrator_rx)
         .await?;
 
-    // Load the previous session state if it exists
-    orchestrator.load_state()?;
+    // Initialize the default agent
+    let model = container.config().llm.model.clone().unwrap_or_else(|| {
+        let agent_type = &container.config().agent.agent_type;
+        match agent_type {
+            config::AgentType::Qwen => "qwen3:4b".to_string(),
+            config::AgentType::Llama => "llama3.2".to_string(),
+            config::AgentType::Granite => "granite3.3".to_string(),
+        }
+    });
+    orchestrator
+        .initialize_default_agent(container.config().session.clone(), model)
+        .await?;
 
     // Get the session history to pass to the interface
     let session_history = orchestrator.get_session_history().clone();
@@ -116,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
     // Run the orchestrator in a separate task
     tokio::spawn(async move {
         if let Err(e) = orchestrator.run().await {
-            eprintln!("Orchestrator error: {}", e);
+            tracing::error!("Orchestrator error: {}", e);
         }
     });
 
@@ -181,6 +191,7 @@ fn create_default_config_from_cli(
 
     config::OxideConfig {
         agent: agent_config,
+        multi_agent: config::MultiAgentConfig::default(),
         no_stream: args.no_stream.unwrap_or(false),
         session: args.session.clone(),
         list_sessions: args.list_sessions.unwrap_or(false),
@@ -223,8 +234,8 @@ fn merge_configs(
                 base_config.agent = file_config.agent;
             }
 
-            if args.no_stream.is_some() {
-                base_config.no_stream = args.no_stream.unwrap();
+            if let Some(no_stream) = args.no_stream {
+                base_config.no_stream = no_stream;
             } else {
                 base_config.no_stream = file_config.no_stream;
             }
@@ -235,8 +246,8 @@ fn merge_configs(
                 base_config.session = file_config.session;
             }
 
-            if args.list_sessions.is_some() {
-                base_config.list_sessions = args.list_sessions.unwrap();
+            if let Some(list_sessions) = args.list_sessions {
+                base_config.list_sessions = list_sessions;
             } else {
                 base_config.list_sessions = file_config.list_sessions;
             }
@@ -264,6 +275,9 @@ fn merge_configs(
 
             // For LLM config, use file config but allow CLI to influence it
             base_config.llm = file_config.llm;
+
+            // For multi-agent config, use file config
+            base_config.multi_agent = file_config.multi_agent;
 
             base_config
         }

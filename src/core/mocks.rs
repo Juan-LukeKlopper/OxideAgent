@@ -1,5 +1,6 @@
 //! Mock objects for testing external dependencies.
 
+use crate::core::llm::client::LlmClient;
 use crate::core::tools::Tool;
 use crate::types::{AppEvent, ChatMessage, Tool as ApiTool};
 use async_trait::async_trait;
@@ -8,9 +9,10 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 // Mock for the Ollama API client
-#[allow(dead_code)] // Fields and methods are used in tests
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MockOllamaClient {
-    pub responses: Vec<serde_json::Value>,
+    pub responses: Vec<String>,
     pub call_count: usize,
 }
 
@@ -20,7 +22,7 @@ impl Default for MockOllamaClient {
     }
 }
 
-#[allow(dead_code)] // Methods are used in tests and form part of the public API
+#[allow(dead_code)]
 impl MockOllamaClient {
     pub fn new() -> Self {
         Self {
@@ -29,44 +31,38 @@ impl MockOllamaClient {
         }
     }
 
-    pub fn add_response(&mut self, response: serde_json::Value) {
-        self.responses.push(response);
+    pub fn add_response(&mut self, response: &str) {
+        self.responses.push(response.to_string());
     }
+}
 
-    pub async fn send_chat(
-        &mut self,
+#[async_trait]
+impl LlmClient for MockOllamaClient {
+    async fn chat(
+        &self,
         _model: &str,
         _history: &[ChatMessage],
         _tools: &[ApiTool],
-        _stream: bool,
+        stream: bool,
         tx: mpsc::Sender<AppEvent>,
     ) -> anyhow::Result<Option<ChatMessage>> {
-        self.call_count += 1;
+        let content = if !self.responses.is_empty() {
+            self.responses
+                .last()
+                .map(|s| s.as_str())
+                .unwrap_or("Default mock response")
+        } else {
+            "Default mock response"
+        };
 
-        if self.call_count > self.responses.len() {
-            // Default response if none provided
-            let default_response = serde_json::json!({
-                "message": {
-                    "content": "Default mock response",
-                    "role": "assistant"
-                }
-            });
-            self.responses.push(default_response);
+        if stream {
+            for c in content.chars() {
+                tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
+            }
+            tx.send(AppEvent::AgentStreamEnd).await?;
         }
 
-        let response = &self.responses[self.call_count - 1];
-        let content = response["message"]["content"]
-            .as_str()
-            .unwrap_or("Default mock response")
-            .to_string();
-
-        // Send streaming events if in streaming mode
-        for c in content.chars() {
-            tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
-        }
-        tx.send(AppEvent::AgentStreamEnd).await?;
-
-        Ok(Some(ChatMessage::assistant(&content)))
+        Ok(Some(ChatMessage::assistant(content)))
     }
 }
 

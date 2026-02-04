@@ -181,7 +181,8 @@ impl Interface for MockInterface {
 /// Create a mock agent for testing
 #[allow(dead_code)]
 pub fn create_mock_agent() -> Agent {
-    Agent::new("MockAgent")
+    let client = Box::new(OxideAgent::core::mocks::MockOllamaClient::new());
+    Agent::new("MockAgent", client)
 }
 
 /// Create a test configuration
@@ -209,5 +210,6 @@ pub fn create_test_config() -> OxideAgent::config::OxideConfig {
             api_key: None,
             model: None,
         },
+        multi_agent: OxideAgent::config::MultiAgentConfig::default(),
     }
 }
