@@ -48,6 +48,15 @@ impl Agent {
         self.history.push(message);
     }
 
+    pub fn update_system_prompt(&mut self, new_system_prompt: &str) {
+        if !self.history.is_empty() && self.history[0].role == "system" {
+            self.history[0] = ChatMessage::system(new_system_prompt);
+        } else {
+            self.history
+                .insert(0, ChatMessage::system(new_system_prompt));
+        }
+    }
+
     pub async fn chat(
         &mut self,
         model: &str,

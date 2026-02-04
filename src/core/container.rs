@@ -71,12 +71,14 @@ impl Container {
             let mut mcp_manager = McpManager::new(tool_registry);
             mcp_manager.launch_servers(&self.config.mcp.tools).await?;
             mcp_manager.launch_remote_server(&self.config.mcp).await?;
-            self.tool_registry = Some(mcp_manager.into_tool_registry());
+            let final_registry = mcp_manager.into_tool_registry();
 
             // Log the final tools in the registry
-            let final_tools = self.tool_registry.as_ref().unwrap().definitions();
+            let final_tools = final_registry.definitions();
             use tracing::info;
             info!("Final tool registry contains {} tools:", final_tools.len());
+
+            self.tool_registry = Some(final_registry);
             for tool in &final_tools {
                 info!(
                     "  - Registered tool: {} - {}",

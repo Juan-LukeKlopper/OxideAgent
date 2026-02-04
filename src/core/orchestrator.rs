@@ -295,4 +295,19 @@ impl Orchestrator {
         // TUI should rely on SessionHistory event
         vec![]
     }
+
+    // Compatibility methods for tests
+    #[allow(dead_code)]
+    pub async fn switch_session(&mut self, session_name: Option<String>) -> anyhow::Result<()> {
+        let name = session_name.unwrap_or_else(|| "default".to_string());
+        self.tx.send(AppEvent::SwitchSession(name)).await?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn load_state(&mut self) -> anyhow::Result<()> {
+        // State is now managed by MultiAgentManager/SessionManager
+        // This is a no-op for compatibility
+        Ok(())
+    }
 }
