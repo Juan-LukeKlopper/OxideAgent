@@ -1,78 +1,11 @@
 //! Mock objects for testing external dependencies.
 
 use crate::core::tools::Tool;
-use crate::types::{AppEvent, ChatMessage, Tool as ApiTool};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use tokio::sync::mpsc;
-
-use crate::core::llm::client::LlmClient;
 
 // Mock for the Ollama API client
-#[derive(Debug, Clone)]
-pub struct MockOllamaClient {
-    pub responses: Vec<String>,
-    pub call_count: usize,
-}
-
-impl Default for MockOllamaClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl MockOllamaClient {
-    pub fn new() -> Self {
-        Self {
-            responses: Vec::new(),
-            call_count: 0,
-        }
-    }
-
-    pub fn add_response(&mut self, response: &str) {
-        self.responses.push(response.to_string());
-    }
-}
-
-#[async_trait]
-impl LlmClient for MockOllamaClient {
-    async fn chat(
-        &self,
-        _model: &str,
-        _history: &[ChatMessage],
-        _tools: &[ApiTool],
-        stream: bool,
-        tx: mpsc::Sender<AppEvent>,
-    ) -> anyhow::Result<Option<ChatMessage>> {
-        // We can't mutate self in chat because it's &self.
-        // But for mock purposes, usually we want interior mutability or just statelessness.
-        // For simplicity, let's just return key based on some logic or fixed response.
-        // Since we changed LlmClient to take &self, stateful mocks need RwLock/Mutex/Cell.
-        // Or we just return a default response.
-
-        let content = if !self.responses.is_empty() {
-            // In a real mock with &self, we'd cycle through checks or have a robust way implies interior mutability.
-            // But existing code had responses: Vec<Value>.
-            // Let's just return the last one or a default.
-            self.responses
-                .last()
-                .map(|s| s.as_str())
-                .unwrap_or("Default mock response")
-        } else {
-            "Default mock response"
-        };
-
-        if stream {
-            for c in content.chars() {
-                tx.send(AppEvent::AgentStreamChunk(c.to_string())).await?;
-            }
-            tx.send(AppEvent::AgentStreamEnd).await?;
-        }
-
-        Ok(Some(ChatMessage::assistant(content)))
-    }
-}
 
 // Mock for file system operations
 pub struct MockFileSystem {

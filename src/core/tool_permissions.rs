@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 
 /// Global tool permissions that apply across all sessions
 #[derive(Serialize, Deserialize, Debug, Default)]

@@ -81,26 +81,6 @@ impl Orchestrator {
         SessionManager::list_sessions()
     }
 
-    pub fn load_state(&mut self) -> anyhow::Result<()> {
-        // State loading is now handled per-agent in MultiAgentManager
-        // This method might be deprecated or used to restore the *active* agent
-        Ok(())
-    }
-
-    fn save_state(&mut self) -> anyhow::Result<()> {
-        // State saving is handled per-agent in MultiAgentManager
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub fn switch_session(&mut self, _session_name: Option<String>) -> anyhow::Result<()> {
-        if let Some(_agent_id) = &self.active_agent_id {
-            // Session switching is now async and handled in the run() loop
-            return Ok(());
-        }
-        Ok(())
-    }
-
     pub async fn initialize_default_agent(
         &mut self,
         session_name: Option<String>,
@@ -141,14 +121,13 @@ impl Orchestrator {
                     }
                 }
                 AppEvent::ToolApproval(response) => {
-                    if let Some(agent_id) = &self.active_agent_id {
-                        if let Err(e) = self
+                    if let Some(agent_id) = &self.active_agent_id
+                        && let Err(e) = self
                             .multi_agent_manager
                             .send_event_to_agent(agent_id, AppEvent::ToolApproval(response))
                             .await
-                        {
-                            self.tx.send(AppEvent::Error(e.to_string())).await?;
-                        }
+                    {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
                 }
                 AppEvent::SwitchSession(session_name) => {
@@ -293,14 +272,13 @@ impl Orchestrator {
                     }
                 },
                 AppEvent::ContinueConversation => {
-                    if let Some(agent_id) = &self.active_agent_id {
-                        if let Err(e) = self
+                    if let Some(agent_id) = &self.active_agent_id
+                        && let Err(e) = self
                             .multi_agent_manager
                             .send_event_to_agent(agent_id, AppEvent::ContinueConversation)
                             .await
-                        {
-                            self.tx.send(AppEvent::Error(e.to_string())).await?;
-                        }
+                    {
+                        self.tx.send(AppEvent::Error(e.to_string())).await?;
                     }
                 }
                 _ => {}

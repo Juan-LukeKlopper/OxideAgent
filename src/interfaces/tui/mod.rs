@@ -703,6 +703,7 @@ impl Tui {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn show_help(&mut self) {
         let help_text = r#"Available commands:
 - Ctrl+q: Quit the application

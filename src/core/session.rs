@@ -205,12 +205,11 @@ impl SessionManager {
         let mut sessions = Vec::new();
 
         // Check for the default session file
-        if Path::new("session.json").exists() {
-            if let Ok(metadata) = fs::metadata("session.json") {
-                if let Ok(modified) = metadata.modified() {
-                    sessions.push(("default".to_string(), modified));
-                }
-            }
+        if Path::new("session.json").exists()
+            && let Ok(metadata) = fs::metadata("session.json")
+            && let Ok(modified) = metadata.modified()
+        {
+            sessions.push(("default".to_string(), modified));
         }
 
         // Look for named session files with retry mechanism to handle race conditions
@@ -247,10 +246,10 @@ impl SessionManager {
                     .strip_suffix(".json")
                     .unwrap();
 
-                if let Ok(metadata) = path.metadata() {
-                    if let Ok(modified) = metadata.modified() {
-                        sessions.push((session_name.to_string(), modified));
-                    }
+                if let Ok(metadata) = path.metadata()
+                    && let Ok(modified) = metadata.modified()
+                {
+                    sessions.push((session_name.to_string(), modified));
                 }
             }
         }

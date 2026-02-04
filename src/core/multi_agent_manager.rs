@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, broadcast, mpsc};
-use tokio::task::JoinHandle;
 
 use crate::config::LLMConfig;
 use crate::core::agents::Agent;
@@ -17,7 +16,6 @@ struct ChatContext<'a> {
     tool_registry: &'a ToolRegistry,
     sender: mpsc::Sender<AppEvent>,
     event_tx: &'a broadcast::Sender<AppEvent>,
-    llm_config: &'a LLMConfig,
     session_state: &'a Arc<RwLock<SessionState>>,
     global_permissions: &'a mut GlobalToolPermissions,
 }
@@ -38,10 +36,6 @@ impl AgentId {
     pub fn new(id: &str) -> Self {
         Self(id.to_string())
     }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
 impl std::fmt::Display for AgentId {
@@ -54,21 +48,10 @@ impl std::fmt::Display for AgentId {
 pub struct AgentInfo {
     pub id: AgentId,
     pub name: String,
-    pub model: String,
-    pub status: AgentStatus,
-    pub session_name: String,
-}
-
-#[derive(Debug, Clone)]
-pub enum AgentStatus {
-    Idle,
-    Processing,
-    Error(String),
 }
 
 pub struct AgentHandle {
     pub agent_info: AgentInfo,
-    pub task_handle: JoinHandle<anyhow::Result<()>>,
     pub tx: mpsc::Sender<AppEvent>,
     pub session_state: Arc<RwLock<SessionState>>,
 }
@@ -76,7 +59,6 @@ pub struct AgentHandle {
 #[derive(Clone)]
 pub struct AgentHandleRef {
     pub agent_info: AgentInfo,
-    pub tx: mpsc::Sender<AppEvent>,
     pub session_state: Arc<RwLock<SessionState>>,
 }
 
@@ -134,14 +116,14 @@ impl MultiAgentManager {
 
         // Pre-clone values that will be used outside the async task
         let task_agent_name = name_clone.clone();
-        let task_agent_model = model_clone.clone();
         let task_agent_tx = agent_tx.clone();
         let task_agent_id_for_task = agent_id.clone();
         let task_agent_id_for_handle = agent_id.clone();
         let task_session_name = session_name_clone.clone();
 
         // Start the agent task
-        let task_handle = tokio::spawn(async move {
+        // Start the agent task
+        tokio::spawn(async move {
             // Create LLM client for this agent
             let llm_client = crate::core::llm::llm_client_factory(&llm_config_clone)
                 .expect("Failed to create LLM client");
@@ -162,12 +144,6 @@ impl MultiAgentManager {
 
             // Global permissions for this agent task
             let mut global_permissions = GlobalToolPermissions::load().unwrap_or_default();
-
-            // Track if agent is currently processing to prevent session switch mid-operation
-            let mut is_processing = false;
-
-            // Queue for deferred session switch
-            let mut pending_session_switch: Option<String> = None;
 
             // Notify that the agent is starting
             let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
@@ -195,19 +171,6 @@ impl MultiAgentManager {
                     Ok(Some(event)) => {
                         match event {
                             AppEvent::SwitchSession(new_session_name) => {
-                                if is_processing {
-                                    // Agent is busy, queue the switch for after processing completes
-                                    info!(
-                                        "Agent busy, queuing session switch to: {:?}",
-                                        new_session_name
-                                    );
-                                    pending_session_switch = Some(new_session_name);
-                                    event_tx_clone.send(AppEvent::AgentMessage(
-                                        "Session switch queued - will complete after current response.".to_string()
-                                    )).ok();
-                                    continue;
-                                }
-
                                 info!("Agent switching session to: {:?}", new_session_name);
 
                                 // Save current state
@@ -288,9 +251,6 @@ impl MultiAgentManager {
                                 }
                             }
                             AppEvent::UserInput(input) => {
-                                // Mark as processing to prevent session switch mid-operation
-                                is_processing = true;
-
                                 // Update agent status
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
@@ -313,7 +273,6 @@ impl MultiAgentManager {
                                     tool_registry: &tool_registry_clone,
                                     sender: stream_tx.clone(),
                                     event_tx: &event_tx_clone,
-                                    llm_config: &llm_config_clone,
                                     session_state: &session_state_for_task,
                                     global_permissions: &mut global_permissions,
                                 };
@@ -324,22 +283,11 @@ impl MultiAgentManager {
                                     event_tx_clone.send(AppEvent::Error(e.to_string())).ok();
                                 }
 
-                                // Mark as done processing
-                                is_processing = false;
-
                                 // Update status back to Idle
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
                                     "Idle".to_string(),
                                 ));
-
-                                // Process any pending session switch
-                                if let Some(queued_session) = pending_session_switch.take() {
-                                    // Re-queue the switch event so it gets processed next iteration
-                                    let _ = agent_tx
-                                        .send(AppEvent::SwitchSession(queued_session))
-                                        .await;
-                                }
                             }
                             AppEvent::ToolApproval(response) => {
                                 if let Some(tool_calls) = pending_tool_calls.take() {
@@ -363,9 +311,6 @@ impl MultiAgentManager {
                                 }
                             }
                             AppEvent::ContinueConversation => {
-                                // Mark as processing
-                                is_processing = true;
-
                                 // Update agent status
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
@@ -379,7 +324,6 @@ impl MultiAgentManager {
                                     tool_registry: &tool_registry_clone,
                                     sender: stream_tx.clone(),
                                     event_tx: &event_tx_clone,
-                                    llm_config: &llm_config_clone,
                                     session_state: &session_state_for_task,
                                     global_permissions: &mut global_permissions,
                                 };
@@ -390,21 +334,11 @@ impl MultiAgentManager {
                                     event_tx_clone.send(AppEvent::Error(e.to_string())).ok();
                                 }
 
-                                // Mark as done processing
-                                is_processing = false;
-
                                 // Update status back to Idle
                                 let _ = event_tx_clone.send(AppEvent::AgentStatusUpdate(
                                     format!("{}-{}", name_clone, task_agent_id_for_task),
                                     "Idle".to_string(),
                                 ));
-
-                                // Process any pending session switch
-                                if let Some(queued_session) = pending_session_switch.take() {
-                                    let _ = agent_tx
-                                        .send(AppEvent::SwitchSession(queued_session))
-                                        .await;
-                                }
                             }
                             AppEvent::AgentStatusUpdate(_, _) => {
                                 // Ignore status updates sent to agent - these are for TUI
@@ -442,7 +376,7 @@ impl MultiAgentManager {
                 "Stopped".to_string(),
             ));
 
-            Ok(())
+            Ok::<(), anyhow::Error>(())
         });
 
         // Create agent handle
@@ -450,11 +384,7 @@ impl MultiAgentManager {
             agent_info: AgentInfo {
                 id: task_agent_id_for_handle,
                 name: task_agent_name,
-                model: task_agent_model,
-                status: AgentStatus::Idle,
-                session_name: session_name_clone,
             },
-            task_handle,
             tx: task_agent_tx, // Use the pre-cloned sender
             session_state: session_state_clone,
         };
@@ -765,38 +695,16 @@ impl MultiAgentManager {
         Ok(())
     }
 
-    pub async fn get_agent(&self, agent_id: &AgentId) -> Option<AgentHandleRef> {
-        self.agents
-            .read()
-            .await
-            .get(agent_id)
-            .map(|handle| AgentHandleRef {
-                agent_info: handle.agent_info.clone(),
-                tx: handle.tx.clone(),
-                session_state: handle.session_state.clone(),
-            })
-    }
-
     pub async fn get_agent_by_name(&self, name: &str) -> Option<AgentHandleRef> {
         for (_id, handle) in self.agents.read().await.iter() {
             if handle.agent_info.name == name {
                 return Some(AgentHandleRef {
                     agent_info: handle.agent_info.clone(),
-                    tx: handle.tx.clone(),
                     session_state: handle.session_state.clone(),
                 });
             }
         }
         None
-    }
-
-    pub async fn list_agents(&self) -> Vec<AgentInfo> {
-        self.agents
-            .read()
-            .await
-            .values()
-            .map(|handle| handle.agent_info.clone())
-            .collect()
     }
 
     pub async fn send_event_to_agent(
@@ -806,77 +714,6 @@ impl MultiAgentManager {
     ) -> anyhow::Result<()> {
         if let Some(handle) = self.agents.read().await.get(agent_id) {
             handle.tx.send(event).await?;
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Agent with ID {} not found", agent_id))
-        }
-    }
-
-    pub async fn remove_agent(&self, agent_id: &AgentId) -> anyhow::Result<()> {
-        if let Some(handle) = self.agents.write().await.remove(agent_id) {
-            // Cancel the agent's task
-            handle.task_handle.abort();
-
-            // Save the session state before removing the agent
-            {
-                let session_state = handle.session_state.read().await;
-                let session_file = SessionManager::get_session_filename(
-                    if handle.agent_info.session_name == "default" {
-                        None
-                    } else {
-                        Some(handle.agent_info.session_name.as_str())
-                    },
-                );
-                SessionManager::save_state(&session_file, &session_state)?;
-            }
-
-            info!("Removed agent: {}", agent_id);
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Agent with ID {} not found", agent_id))
-        }
-    }
-
-    pub async fn switch_agent_session(
-        &self,
-        agent_id: &AgentId,
-        session_name: Option<String>,
-    ) -> anyhow::Result<()> {
-        if let Some(handle) = self.agents.read().await.get(agent_id) {
-            // Save current session state
-            let session_file = SessionManager::get_session_filename(
-                if handle.agent_info.session_name == "default" {
-                    None
-                } else {
-                    Some(handle.agent_info.session_name.as_str())
-                },
-            );
-            {
-                let session_state = handle.session_state.read().await;
-                SessionManager::save_state(&session_file, &session_state)?;
-            }
-
-            // Load new session state
-            let new_session_file = SessionManager::get_session_filename(session_name.as_deref());
-            let new_session_state =
-                (SessionManager::load_state(&new_session_file)?).unwrap_or_default();
-
-            // Update agent history with new session
-            {
-                let mut agent_state = handle.session_state.write().await;
-                *agent_state = new_session_state.clone();
-            }
-
-            // Update the agent info
-            // We need to update this on the actual handle, which is in a different task
-            // For now, we'll send an event to update this
-            let _ = handle
-                .tx
-                .send(AppEvent::SwitchSession(
-                    session_name.unwrap_or_else(|| "default".to_string()),
-                ))
-                .await;
-
             Ok(())
         } else {
             Err(anyhow::anyhow!("Agent with ID {} not found", agent_id))
