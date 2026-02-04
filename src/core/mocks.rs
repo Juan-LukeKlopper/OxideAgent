@@ -1,12 +1,12 @@
 //! Mock objects for testing external dependencies.
 
+use crate::core::llm::client::LlmClient;
 use crate::core::tools::Tool;
 use crate::types::{AppEvent, ChatMessage, Tool as ApiTool};
 use async_trait::async_trait;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
-use crate::core::llm::client::LlmClient;
 
 // Mock for the Ollama API client
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ impl LlmClient for MockOllamaClient {
         tx: mpsc::Sender<AppEvent>,
     ) -> anyhow::Result<Option<ChatMessage>> {
         let content = if !self.responses.is_empty() {
-             self.responses
+            self.responses
                 .last()
                 .map(|s| s.as_str())
                 .unwrap_or("Default mock response")
