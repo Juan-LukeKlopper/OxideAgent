@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 
 // Mock for the Ollama API client
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MockOllamaClient {
     pub responses: Vec<String>,
     pub call_count: usize,
@@ -21,6 +22,7 @@ impl Default for MockOllamaClient {
     }
 }
 
+#[allow(dead_code)]
 impl MockOllamaClient {
     pub fn new() -> Self {
         Self {

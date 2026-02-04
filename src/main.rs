@@ -234,8 +234,8 @@ fn merge_configs(
                 base_config.agent = file_config.agent;
             }
 
-            if args.no_stream.is_some() {
-                base_config.no_stream = args.no_stream.unwrap();
+            if let Some(no_stream) = args.no_stream {
+                base_config.no_stream = no_stream;
             } else {
                 base_config.no_stream = file_config.no_stream;
             }
@@ -246,8 +246,8 @@ fn merge_configs(
                 base_config.session = file_config.session;
             }
 
-            if args.list_sessions.is_some() {
-                base_config.list_sessions = args.list_sessions.unwrap();
+            if let Some(list_sessions) = args.list_sessions {
+                base_config.list_sessions = list_sessions;
             } else {
                 base_config.list_sessions = file_config.list_sessions;
             }

@@ -189,17 +189,36 @@ fn test_session_manager_load_invalid_json() {
 }
 
 use lazy_static::lazy_static;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 lazy_static! {
     static ref CWD_MUTEX: Mutex<()> = Mutex::new(());
 }
 
+struct CwdGuard {
+    original: PathBuf,
+}
+
+impl CwdGuard {
+    fn new() -> Self {
+        let original = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
+        Self { original }
+    }
+}
+
+impl Drop for CwdGuard {
+    fn drop(&mut self) {
+        let _ = std::env::set_current_dir(&self.original);
+    }
+}
+
 #[test]
 fn test_session_manager_list_sessions_default() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
-    let original_cwd = std::env::current_dir().unwrap();
+    // let original_cwd = std::env::current_dir().unwrap(); // Handled by guard
 
     // Change to temp directory for testing
     std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -226,16 +245,13 @@ fn test_session_manager_list_sessions_default() {
 
     // Check if default session is listed
     assert!(sessions.contains(&"default".to_string()));
-
-    // Restore original working directory
-    std::env::set_current_dir(&original_cwd).unwrap();
 }
 
 #[test]
 fn test_session_manager_list_sessions_named() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
-    let original_cwd = std::env::current_dir().unwrap();
 
     // Change to temp directory for testing
     std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -262,9 +278,6 @@ fn test_session_manager_list_sessions_named() {
 
     // Check if named session is listed
     assert!(sessions.contains(&"test_named".to_string()));
-
-    // Restore original working directory
-    std::env::set_current_dir(&original_cwd).unwrap();
 }
 
 #[test]
@@ -281,9 +294,9 @@ fn test_session_manager_get_session_filename() {
 
 #[test]
 fn test_session_manager_list_sessions_sorted_by_recency() {
-    let _guard = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap();
+    let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
-    let original_cwd = std::env::current_dir().unwrap();
 
     // Change to temp directory for testing
     std::env::set_current_dir(temp_dir.path()).unwrap();
@@ -323,7 +336,4 @@ fn test_session_manager_list_sessions_sorted_by_recency() {
         middle_pos.unwrap() < old_pos.unwrap(),
         "middle session should appear before old session"
     );
-
-    // Restore original working directory
-    std::env::set_current_dir(&original_cwd).unwrap();
 }
