@@ -6,8 +6,11 @@ use OxideAgent::core::tools::ToolRegistry;
 use OxideAgent::types::AppEvent;
 use tokio::sync::mpsc;
 
+use crate::utils::CWD_MUTEX;
+
 #[tokio::test]
 async fn test_orchestrator_new() {
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory
@@ -56,6 +59,7 @@ async fn test_orchestrator_new() {
 
 #[tokio::test]
 async fn test_orchestrator_get_session_history() {
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory
@@ -103,6 +107,7 @@ async fn test_orchestrator_get_session_history() {
 
 #[tokio::test]
 async fn test_orchestrator_load_state_empty() {
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Use a guard to ensure we always restore the original directory

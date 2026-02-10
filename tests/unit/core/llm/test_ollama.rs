@@ -22,7 +22,7 @@ async fn test_list_models_success() {
             }));
     });
 
-    let client = Client::new();
+    let client = Client::builder().no_proxy().build().unwrap();
     let base_url = server.base_url();
     let result = list_models(&client, &base_url).await;
 
@@ -44,7 +44,7 @@ async fn test_list_models_empty() {
                 "models": []
             }));
     });
-    let client = Client::new();
+    let client = Client::builder().no_proxy().build().unwrap();
     let base_url = server.base_url();
     let result = list_models(&client, &base_url).await;
     mock.assert();
@@ -60,7 +60,7 @@ async fn test_list_models_error() {
         when.method(GET).path("/api/tags");
         then.status(500);
     });
-    let client = Client::new();
+    let client = Client::builder().no_proxy().build().unwrap();
     let base_url = server.base_url();
     let result = list_models(&client, &base_url).await;
     mock.assert();

@@ -11,7 +11,7 @@ OxideAgent is a sophisticated AI agent that provides a powerful command-line int
 This project has undergone a comprehensive refactoring to improve its architecture, modularity, and maintainability:
 
 - **Modular Architecture**: Clean separation of core logic and interface implementations
-- **Interface Abstraction**: Support for multiple interface types (TUI, future Web, Telegram, etc.)
+- **Interface Abstraction**: Support for multiple interface types (TUI, Web/Telegram/Discord scaffolding)
 - **Configuration Management**: Centralized configuration with validation
 - **Dependency Injection**: Service container for managing component dependencies
 - **Enhanced Event System**: Robust event system for communication between components
@@ -227,7 +227,9 @@ The application uses an event-driven architecture with comprehensive event types
 
 ## Planned Expansions
 
-The current implementation focuses on the Terminal User Interface (TUI), but the architecture is designed to be extensible to other interfaces and platforms:
+Detailed execution plan: [`INTERFACE_EXPANSION_IMPLEMENTATION_PLAN.md`](INTERFACE_EXPANSION_IMPLEMENTATION_PLAN.md).
+
+The current implementation focuses on the Terminal User Interface (TUI), and now includes explicit interface scaffolding for Web, Telegram, and Discord in CLI/config (runtime implementation pending):
 
 ### Web UI
 
@@ -242,10 +244,19 @@ The project is designed with a clean separation between core logic and UI presen
 
 The modular architecture allows for easy integration with messaging platforms like Telegram:
 
-1. **Bot Implementation**: A Telegram bot interface can be added as a new entry point alongside the TUI.
+1. **Bot Implementation**: Telegram is now represented as a first-class interface option in CLI/config scaffolding.
 2. **Session Management**: Each Telegram user or chat can have its own session, similar to named sessions in the TUI.
 3. **Agent Spawning**: Users can spawn and interact with different agents through Telegram commands.
 4. **Tool Approval**: The security model can be adapted to work with Telegram's messaging system.
+
+### Discord Bots
+
+Discord support follows the same interface abstraction model as Telegram/Web:
+
+1. **Bot Implementation**: Discord is now represented as a first-class interface option in CLI/config scaffolding.
+2. **Session Mapping**: Discord guild/channel/user contexts can map to named sessions.
+3. **Agent Orchestration**: Multi-agent controls can be exposed via slash commands.
+4. **Tool Approval UX**: Tool approvals can map to Discord interaction components.
 
 ## Project Roadmap
 
@@ -266,6 +277,7 @@ Future development will focus on:
 - **Advanced Workflow Management**: Handle complex, multi-step operations with better planning and error handling
 - **Web UI Implementation**: Add a web-based interface for broader accessibility
 - **Telegram Bot Integration**: Enable interaction with agents through Telegram
+- **Discord Bot Integration**: Enable interaction with agents through Discord
 - **Additional Platform Support**: Expand to other messaging platforms and interfaces
 
 ## Contributing

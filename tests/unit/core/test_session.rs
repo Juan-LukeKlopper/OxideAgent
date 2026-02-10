@@ -188,13 +188,9 @@ fn test_session_manager_load_invalid_json() {
     assert_eq!(session_state.list_allowed_tools().len(), 0);
 }
 
-use lazy_static::lazy_static;
 use std::path::PathBuf;
-use std::sync::Mutex;
 
-lazy_static! {
-    static ref CWD_MUTEX: Mutex<()> = Mutex::new(());
-}
+use crate::utils::CWD_MUTEX;
 
 struct CwdGuard {
     original: PathBuf,
@@ -215,7 +211,7 @@ impl Drop for CwdGuard {
 
 #[test]
 fn test_session_manager_list_sessions_default() {
-    let _lock = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
     // let original_cwd = std::env::current_dir().unwrap(); // Handled by guard
@@ -249,7 +245,7 @@ fn test_session_manager_list_sessions_default() {
 
 #[test]
 fn test_session_manager_list_sessions_named() {
-    let _lock = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
 
@@ -294,7 +290,7 @@ fn test_session_manager_get_session_filename() {
 
 #[test]
 fn test_session_manager_list_sessions_sorted_by_recency() {
-    let _lock = CWD_MUTEX.lock().unwrap();
+    let _lock = CWD_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let _cwd_guard = CwdGuard::new();
     let temp_dir = TempDir::new().unwrap();
 

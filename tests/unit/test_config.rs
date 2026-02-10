@@ -253,9 +253,22 @@ fn test_default_functions() {
 #[test]
 fn test_interface_type_from_cli() {
     use OxideAgent::cli::InterfaceType as CliInterfaceType;
+
     assert_eq!(
         InterfaceType::from(CliInterfaceType::Tui),
         InterfaceType::Tui
+    );
+    assert_eq!(
+        InterfaceType::from(CliInterfaceType::Web),
+        InterfaceType::Web
+    );
+    assert_eq!(
+        InterfaceType::from(CliInterfaceType::Telegram),
+        InterfaceType::Telegram
+    );
+    assert_eq!(
+        InterfaceType::from(CliInterfaceType::Discord),
+        InterfaceType::Discord
     );
 }
 
@@ -310,4 +323,25 @@ fn test_config_validation_empty_session() {
         ..Default::default()
     };
     assert!(config.validate().is_err());
+}
+
+#[test]
+fn test_config_interface_type_from_json_variants() {
+    let web = r#"{
+  "interface": "Web"
+}"#;
+    let telegram = r#"{
+  "interface": "Telegram"
+}"#;
+    let discord = r#"{
+  "interface": "Discord"
+}"#;
+
+    let web_config: OxideConfig = serde_json::from_str(web).unwrap();
+    let telegram_config: OxideConfig = serde_json::from_str(telegram).unwrap();
+    let discord_config: OxideConfig = serde_json::from_str(discord).unwrap();
+
+    assert_eq!(web_config.interface, InterfaceType::Web);
+    assert_eq!(telegram_config.interface, InterfaceType::Telegram);
+    assert_eq!(discord_config.interface, InterfaceType::Discord);
 }

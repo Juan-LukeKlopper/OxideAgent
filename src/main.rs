@@ -309,5 +309,20 @@ fn create_interface(
             )?;
             Ok(Box::new(tui))
         }
+        config::InterfaceType::Web => {
+            anyhow::bail!(
+                "Web interface is planned but not yet implemented. Please use --interface tui."
+            )
+        }
+        config::InterfaceType::Telegram => {
+            anyhow::bail!(
+                "Telegram interface is planned but not yet implemented. Please use --interface tui."
+            )
+        }
+        config::InterfaceType::Discord => {
+            anyhow::bail!(
+                "Discord interface is planned but not yet implemented. Please use --interface tui."
+            )
+        }
     }
 }

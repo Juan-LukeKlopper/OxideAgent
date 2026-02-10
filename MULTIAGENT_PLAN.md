@@ -33,8 +33,23 @@ Multi-agent support for OxideAgent is now **fully implemented** across backend a
 - [x] All 168 tests passing
 - [x] Documentation updated
 
+## Phase 7: CI Reliability Hardening ✅
+- [x] Added shared CWD test synchronization utilities
+- [x] Hardened session/orchestrator tests against poisoned mutexes
+- [x] Updated Ollama HTTP client/test setup to bypass proxy for local mock servers
+
+## Phase 8: Interface Expansion Scaffolding ✅
+- [x] Added Web interface enum/config/CLI scaffolding
+- [x] Added Telegram interface enum/config/CLI scaffolding
+- [x] Added Discord interface enum/config/CLI scaffolding
+- [x] Added explicit runtime error messaging for non-TUI interface selections
+
 ## How to Use
 1. Press `Ctrl+A` to open agent switcher
 2. Use arrows to navigate, Enter to select
 3. Agents: Qwen, Llama, Granite (creates new agent on first switch)
 4. Each agent maintains separate conversation history
+
+
+## Detailed Follow-up Plan
+- Interface implementation details are tracked in `INTERFACE_EXPANSION_IMPLEMENTATION_PLAN.md`.
