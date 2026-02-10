@@ -54,3 +54,9 @@ failures:
 test result: FAILED. 167 passed; 2 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.89s
 
 Error: Process completed with exit code 101.
+
+## Resolution
+
+- Added a shared global CWD mutex for tests that mutate process working directory.
+- Updated session/orchestrator tests to recover from poisoned mutex state in follow-up tests.
+- Updated Ollama HTTP client construction (and list-model tests) to bypass proxies for localhost/mock-server traffic.

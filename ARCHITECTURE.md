@@ -12,7 +12,7 @@ OxideAgent follows a modular architecture with clear separation of concerns. The
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Interface     │◄──►│   Core Logic     │◄──►│ Configuration   │
 │  (TUI, Web,     │    │                  │    │                 │
-│  Telegram, etc) │    │  - Orchestrator  │    │  - Config       │
+│ Telegram,Discord)│    │  - Orchestrator  │    │  - Config       │
 │                 │    │  - MultiAgent    │    │  - Container    │
 │                 │    │  - Tools         │    │                 │
 │                 │    │  - Session       │    │                 │
@@ -86,7 +86,7 @@ Currently implemented:
 
 ### Interfaces Module (`src/interfaces/`)
 
-Interface implementations, currently only TUI:
+Interface implementations, currently TUI with Web/Telegram/Discord scaffolding in config+CLI:
 
 - **tui/**: Terminal User Interface implementation
 - **mod.rs**: Interface trait implementations
@@ -149,7 +149,7 @@ The testing infrastructure includes:
 The architecture supports:
 
 - Adding new LLM providers (OpenAI, Anthropic, etc.) via `LlmClient` trait
-- Adding new interface types (Web UI, Telegram bot)
+- Adding new interface types (Web UI, Telegram bot, Discord bot)
 - Adding new tools through the trait system
 - Integration with Model Context Protocol (MCP) servers
 - Advanced workflow management with multiple agents

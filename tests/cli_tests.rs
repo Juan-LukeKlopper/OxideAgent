@@ -122,3 +122,39 @@ fn test_cli_config_arg() {
         assert_eq!(cli_args.config, Some("config.toml".to_string()));
     }
 }
+
+#[test]
+fn test_cli_interface_arg_web() {
+    let args = vec!["oxide-agent", "--interface", "web"];
+    let parsed = std::panic::catch_unwind(|| OxideAgent::cli::Args::try_parse_from(args));
+
+    assert!(parsed.is_ok());
+
+    if let Ok(Ok(cli_args)) = parsed {
+        assert_eq!(cli_args.interface, Some(InterfaceType::Web));
+    }
+}
+
+#[test]
+fn test_cli_interface_arg_telegram() {
+    let args = vec!["oxide-agent", "--interface", "telegram"];
+    let parsed = std::panic::catch_unwind(|| OxideAgent::cli::Args::try_parse_from(args));
+
+    assert!(parsed.is_ok());
+
+    if let Ok(Ok(cli_args)) = parsed {
+        assert_eq!(cli_args.interface, Some(InterfaceType::Telegram));
+    }
+}
+
+#[test]
+fn test_cli_interface_arg_discord() {
+    let args = vec!["oxide-agent", "--interface", "discord"];
+    let parsed = std::panic::catch_unwind(|| OxideAgent::cli::Args::try_parse_from(args));
+
+    assert!(parsed.is_ok());
+
+    if let Ok(Ok(cli_args)) = parsed {
+        assert_eq!(cli_args.interface, Some(InterfaceType::Discord));
+    }
+}

@@ -4,6 +4,8 @@
 
 - Add MultiAgent support to OxideAgent's core
 - Add multiAgent sections to TUI to allow us to swap between sessions and see active sessions
+- CI reliability hardening for session/CWD tests and local Ollama mock HTTP tests
+- Web/Telegram/Discord interface scaffolding added to CLI/config with explicit runtime messaging
 
 ## [0.0.3] - 2025-12-09
 

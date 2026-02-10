@@ -110,7 +110,9 @@ pub enum AgentType {
 pub enum InterfaceType {
     #[default]
     Tui,
-    // In the future we could add Web, Telegram, etc.
+    Web,
+    Telegram,
+    Discord,
 }
 
 /// Multi-agent mode configuration
@@ -153,6 +155,9 @@ impl From<crate::cli::InterfaceType> for InterfaceType {
     fn from(cli_type: crate::cli::InterfaceType) -> Self {
         match cli_type {
             crate::cli::InterfaceType::Tui => InterfaceType::Tui,
+            crate::cli::InterfaceType::Web => InterfaceType::Web,
+            crate::cli::InterfaceType::Telegram => InterfaceType::Telegram,
+            crate::cli::InterfaceType::Discord => InterfaceType::Discord,
         }
     }
 }

@@ -7,7 +7,7 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::json;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 pub async fn list_models(client: &Client, api_base: &str) -> anyhow::Result<Vec<String>> {
     let url = format!("{}/api/tags", api_base);
@@ -42,8 +42,16 @@ pub struct OllamaClient {
 
 impl OllamaClient {
     pub fn new(api_base: &str) -> Self {
+        let client = Client::builder().no_proxy().build().unwrap_or_else(|error| {
+            warn!(
+                "Failed to build reqwest client with no_proxy, falling back to default client: {}",
+                error
+            );
+            Client::new()
+        });
+
         Self {
-            client: Client::new(),
+            client,
             api_base: api_base.to_string(),
         }
     }

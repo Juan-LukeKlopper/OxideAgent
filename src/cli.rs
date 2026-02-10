@@ -54,7 +54,9 @@ pub enum AgentType {
 #[derive(ValueEnum, Debug, Clone, PartialEq)]
 pub enum InterfaceType {
     Tui,
-    // In the future we could add Web, Telegram, etc.
+    Web,
+    Telegram,
+    Discord,
 }
 
 impl AgentType {
