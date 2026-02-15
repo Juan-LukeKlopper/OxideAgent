@@ -211,5 +211,8 @@ pub fn create_test_config() -> OxideAgent::config::OxideConfig {
             model: None,
         },
         multi_agent: OxideAgent::config::MultiAgentConfig::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     }
 }

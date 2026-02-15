@@ -184,5 +184,8 @@ fn create_test_config() -> Config {
             model: Some("qwen3:4b".to_string()),
         },
         multi_agent: OxideAgent::config::MultiAgentConfig::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     }
 }

@@ -144,6 +144,9 @@ fn test_create_test_config() {
             model: Some("qwen3:4b".to_string()),
         },
         multi_agent: Default::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     };
 
     assert_eq!(config.agent.name, "Qwen");

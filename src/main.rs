@@ -8,6 +8,7 @@ mod types;
 
 use crate::core::interface::Interface;
 use crate::interfaces::tui::Tui;
+use crate::interfaces::web::WebInterface;
 use crate::types::{AppEvent, ChatMessage};
 use clap::Parser;
 use reqwest::Client;
@@ -206,6 +207,9 @@ fn create_default_config_from_cli(
             tools: vec![],
         },
         llm: llm_config.clone(),
+        web: None,
+        telegram: None,
+        discord: None,
     }
 }
 
@@ -309,11 +313,12 @@ fn create_interface(
             )?;
             Ok(Box::new(tui))
         }
-        config::InterfaceType::Web => {
-            anyhow::bail!(
-                "Web interface is planned but not yet implemented. Please use --interface tui."
-            )
-        }
+        config::InterfaceType::Web => Ok(Box::new(WebInterface::new(
+            rx,
+            tx,
+            session_name,
+            session_history,
+        ))),
         config::InterfaceType::Telegram => {
             anyhow::bail!(
                 "Telegram interface is planned but not yet implemented. Please use --interface tui."
