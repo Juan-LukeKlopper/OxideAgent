@@ -50,6 +50,9 @@ async fn test_tool_execution_workflow() {
             model: None,
         },
         multi_agent: Default::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     };
 
     // Create channels for communication

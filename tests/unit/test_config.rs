@@ -1,6 +1,7 @@
 use OxideAgent::config::{
-    AgentType, InterfaceType, OxideConfig, default_api_base, default_model, default_name,
-    default_provider, default_system_prompt,
+    AgentType, DiscordInterfaceConfig, InterfaceType, OxideConfig, TelegramInterfaceConfig,
+    WebInterfaceConfig, default_api_base, default_model, default_name, default_provider,
+    default_system_prompt,
 };
 use std::fs;
 use std::io::Write;
@@ -344,4 +345,60 @@ fn test_config_interface_type_from_json_variants() {
     assert_eq!(web_config.interface, InterfaceType::Web);
     assert_eq!(telegram_config.interface, InterfaceType::Telegram);
     assert_eq!(discord_config.interface, InterfaceType::Discord);
+}
+
+#[test]
+fn test_interface_transport_config_defaults_and_validation() {
+    let mut config = OxideConfig {
+        web: Some(WebInterfaceConfig::default()),
+        telegram: Some(TelegramInterfaceConfig {
+            bot_token: "telegram-token".to_string(),
+            polling_interval_ms: 1000,
+            request_timeout_secs: 30,
+        }),
+        discord: Some(DiscordInterfaceConfig {
+            bot_token: "discord-token".to_string(),
+            application_id: "123456".to_string(),
+            guild_id: None,
+        }),
+        ..Default::default()
+    };
+
+    assert!(config.validate().is_ok());
+
+    config.web = Some(WebInterfaceConfig {
+        port: 0,
+        ..WebInterfaceConfig::default()
+    });
+    assert!(config.validate().is_err());
+}
+
+#[test]
+fn test_transport_config_parses_from_toml() {
+    let toml_content = r#"
+interface = "Web"
+
+[web]
+host = "0.0.0.0"
+port = 8088
+enable_cors = true
+max_payload_bytes = 2048
+
+[telegram]
+bot_token = "telegram-token"
+polling_interval_ms = 500
+request_timeout_secs = 20
+
+[discord]
+bot_token = "discord-token"
+application_id = "abc123"
+guild_id = "guild-1"
+"#;
+
+    let config: OxideConfig = toml::from_str(toml_content).unwrap();
+
+    assert_eq!(config.interface, InterfaceType::Web);
+    assert_eq!(config.web.unwrap().port, 8088);
+    assert_eq!(config.telegram.unwrap().polling_interval_ms, 500);
+    assert_eq!(config.discord.unwrap().guild_id.as_deref(), Some("guild-1"));
 }

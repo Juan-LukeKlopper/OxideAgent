@@ -31,6 +31,9 @@ async fn test_tool_execution_workflow() {
         mcp: Default::default(),
         session: None,
         multi_agent: Default::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     };
 
     // Create channels for communication
@@ -82,6 +85,9 @@ async fn test_orchestrator_session_switching() {
             model: None,
         },
         multi_agent: Default::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     };
 
     // Create channels for communication
@@ -147,6 +153,9 @@ async fn test_orchestrator_tool_approvals() {
             model: None,
         },
         multi_agent: Default::default(),
+        web: None,
+        telegram: None,
+        discord: None,
     };
 
     // Create channels for communication

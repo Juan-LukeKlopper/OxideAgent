@@ -40,6 +40,83 @@ pub struct OxideConfig {
     /// LLM provider configuration
     #[serde(default)]
     pub llm: LLMConfig,
+
+    /// Web interface transport configuration
+    #[serde(default)]
+    pub web: Option<WebInterfaceConfig>,
+
+    /// Telegram interface transport configuration
+    #[serde(default)]
+    pub telegram: Option<TelegramInterfaceConfig>,
+
+    /// Discord interface transport configuration
+    #[serde(default)]
+    pub discord: Option<DiscordInterfaceConfig>,
+}
+
+/// Web interface configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WebInterfaceConfig {
+    /// Interface bind host
+    #[serde(default = "default_web_host")]
+    pub host: String,
+
+    /// Interface bind port
+    #[serde(default = "default_web_port")]
+    pub port: u16,
+
+    /// Optional API authentication token
+    #[serde(default)]
+    pub auth_token: Option<String>,
+
+    /// Enable CORS for cross-origin clients
+    #[serde(default)]
+    pub enable_cors: bool,
+
+    /// Maximum accepted payload size in bytes
+    #[serde(default = "default_web_max_payload_bytes")]
+    pub max_payload_bytes: usize,
+}
+
+impl Default for WebInterfaceConfig {
+    fn default() -> Self {
+        Self {
+            host: default_web_host(),
+            port: default_web_port(),
+            auth_token: None,
+            enable_cors: false,
+            max_payload_bytes: default_web_max_payload_bytes(),
+        }
+    }
+}
+
+/// Telegram interface configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TelegramInterfaceConfig {
+    /// Telegram bot token
+    pub bot_token: String,
+
+    /// Polling interval in milliseconds
+    #[serde(default = "default_telegram_polling_interval_ms")]
+    pub polling_interval_ms: u64,
+
+    /// Request timeout in seconds
+    #[serde(default = "default_telegram_request_timeout_secs")]
+    pub request_timeout_secs: u64,
+}
+
+/// Discord interface configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DiscordInterfaceConfig {
+    /// Discord bot token
+    pub bot_token: String,
+
+    /// Discord application id used for command registration
+    pub application_id: String,
+
+    /// Optional default guild for local command registration
+    #[serde(default)]
+    pub guild_id: Option<String>,
 }
 
 /// Agent configuration
@@ -186,6 +263,26 @@ pub fn default_max_agents() -> usize {
     5
 }
 
+pub fn default_web_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+pub fn default_web_port() -> u16 {
+    8080
+}
+
+pub fn default_web_max_payload_bytes() -> usize {
+    1024 * 1024
+}
+
+pub fn default_telegram_polling_interval_ms() -> u64 {
+    1000
+}
+
+pub fn default_telegram_request_timeout_secs() -> u64 {
+    30
+}
+
 impl OxideConfig {
     /// Create a new configuration from a file path (auto-detect format by extension)
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
@@ -252,6 +349,32 @@ impl OxideConfig {
             // Check for invalid characters in session name
             if session.contains('/') || session.contains('\\') || session.contains(':') {
                 return Err(anyhow::anyhow!("Session name contains invalid characters"));
+            }
+        }
+
+        if let Some(web) = &self.web {
+            if web.port == 0 {
+                return Err(anyhow::anyhow!("Web interface port must be greater than 0"));
+            }
+            if web.max_payload_bytes == 0 {
+                return Err(anyhow::anyhow!(
+                    "Web interface max_payload_bytes must be greater than 0"
+                ));
+            }
+        }
+
+        if let Some(telegram) = &self.telegram
+            && telegram.bot_token.trim().is_empty()
+        {
+            return Err(anyhow::anyhow!("Telegram bot_token cannot be empty"));
+        }
+
+        if let Some(discord) = &self.discord {
+            if discord.bot_token.trim().is_empty() {
+                return Err(anyhow::anyhow!("Discord bot_token cannot be empty"));
+            }
+            if discord.application_id.trim().is_empty() {
+                return Err(anyhow::anyhow!("Discord application_id cannot be empty"));
             }
         }
 

@@ -4,3 +4,7 @@
 //! for different types of interfaces (TUI, Web, Telegram, etc.)
 
 pub mod tui;
+
+pub mod adapters;
+pub mod capabilities;
+pub mod web;
